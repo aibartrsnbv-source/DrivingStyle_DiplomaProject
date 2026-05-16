@@ -451,33 +451,42 @@ class CameraFeatureExtractor:
         """
         idx = {name: i for i, name in enumerate(CAMERA_FEATURE_NAMES)}
 
-        # 1. Speed violation (25%) — calibrated to dashcam flow at 320×240
-        #    ~4.5 px/frame ≈ 60 km/h, so 60 km/h = reference "city limit"
-        speed_risk = min(speed_kmh / 60.0, 1.0) * 0.25
+        # 1. Speed violation (25%) — реальное превышение
+        # До 60 км/ч риск 0, к 100 км/ч полный вес
+        speed_excess = max(0.0, speed_kmh - 60.0)
+        speed_risk = min(speed_excess / 40.0, 1.0) * 0.25
 
-        # 2. Harsh braking (20%) — even 2 events in 30-frame window = full score
+        # 2. Harsh braking (15%) — нужно много событий для значимого риска,
+        # учитывая что детектор фолсит на качке камеры
         brakes = float(cam_vec[idx["harsh_brake_count"]])
-        brake_risk = min(brakes / 2.0, 1.0) * 0.20
+        brake_risk = min(max(0.0, brakes - 2.0) / 4.0, 1.0) * 0.15
 
-        # 3. Harsh acceleration (15%)
+        # 3. Harsh acceleration (10%)
         accels = float(cam_vec[idx["harsh_accel_count"]])
-        accel_risk = min(accels / 2.0, 1.0) * 0.15
+        accel_risk = min(max(0.0, accels - 2.0) / 4.0, 1.0) * 0.10
 
-        # 4. Lane discipline / lateral flow (15%)
+        # 4. Lateral / lane (10%) — порог сильно поднят: на прямой трассе
+        # из-за перспективы камеры lat_flow стабильно 1.5-1.8, это норма.
+        # Реальные перестроения дают всплески 2.5+
         lat_flow = float(cam_vec[idx["flow_lateral_mean"]])
-        lane_risk = min(lat_flow / 0.5, 1.0) * 0.15
+        lane_risk = min(max(0.0, lat_flow - 2.0) / 1.5, 1.0) * 0.10
 
-        # 5. Following distance (10%) — large bbox area = tailgating
+        # 5. Following distance (25%) — главный реальный сигнал опасности.
+        # Tailgating: leading_area_mean > 8% (порог поднят с 5%, т.к. на
+        # FullHD-видео даже далёкая машина даёт 2-3%). К 15% — полный риск.
         lead_area = float(cam_vec[idx["leading_area_mean"]])
-        follow_risk = min(lead_area / 0.10, 1.0) * 0.10
+        follow_risk = min(max(0.0, lead_area - 0.08) / 0.07, 1.0) * 0.25
 
-        # 6. Speed variance = erratic driving (10%)
+        # 6. Speed variance (10%) — реальная эрратичная езда
         speed_std = float(cam_vec[idx["speed_std"]])
-        variance_risk = min(speed_std / 0.3, 1.0) * 0.10
+        variance_risk = min(max(0.0, speed_std - 0.3) / 0.4, 1.0) * 0.10
 
-        # 7. Speeding ratio (5%)
-        speeding = float(cam_vec[idx["speeding_ratio"]])
-        speeding_risk = speeding * 0.05
+        # 7. Speeding ratio (5%) — компонент сильно ослаблен, т.к. в текущем виде
+        # (speeds > SPEEDING_FLOW_THRESH=1.2) он всегда 1.0 при любой езде.
+        # Считаем долю кадров с РЕАЛЬНО высоким flow (proxy для серьёзного превышения)
+        speeds = np.array([cam_vec[idx["speed_mean"]], cam_vec[idx["speed_max"]]])
+        real_speeding = 1.0 if cam_vec[idx["speed_max"]] > 4.5 else 0.0
+        speeding_risk = real_speeding * 0.05
 
         risk_score = float(np.clip(
             speed_risk + brake_risk + accel_risk + lane_risk +
@@ -485,17 +494,29 @@ class CameraFeatureExtractor:
             0.0, 1.0
         ))
 
-        # Thresholds calibrated for real dashcam footage
-        if risk_score >= 0.65:
+        # Пороги уровней — без изменений
+        if risk_score >= 0.75:
             level = "CRITICAL"
-        elif risk_score >= 0.45:
+        elif risk_score >= 0.55:
             level = "HIGH"
-        elif risk_score >= 0.22:
+        elif risk_score >= 0.30:
             level = "MEDIUM"
         else:
             level = "LOW"
 
-        return risk_score, level
+        breakdown = {
+            "speed": round(speed_risk, 3),
+            "brake": round(brake_risk, 3),
+            "accel": round(accel_risk, 3),
+            "lane": round(lane_risk, 3),
+            "follow": round(follow_risk, 3),
+            "variance": round(variance_risk, 3),
+            "speeding": round(speeding_risk, 3),
+            "lead_area_raw": round(float(cam_vec[idx["leading_area_mean"]]), 4),
+            "lat_flow_raw": round(float(cam_vec[idx["flow_lateral_mean"]]), 4),
+            "speed_kmh_raw": round(speed_kmh, 1),
+        }
+        return risk_score, level, breakdown
 
     def reset(self) -> None:
         self._buffer.clear()

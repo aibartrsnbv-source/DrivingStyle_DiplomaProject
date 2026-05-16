@@ -243,6 +243,10 @@ async def _inference_loop(
         # Session-level accumulators (only increment, never reset per-frame)
         no_vehicle_frames = 0   # consecutive frames without a vehicle
         NO_VEHICLE_THRESHOLD = 15  # if no vehicle for this many frames → not a driving scene
+        # EMA-сглаживание риска во времени (α=0.15 → лаг ~6-7 кадров)
+        ema_risk_score = 0.0
+        EMA_ALPHA = 0.15
+        ema_initialized = False
 
         while not stop_event.is_set():
             ret, frame = cap.read()
@@ -344,10 +348,10 @@ async def _inference_loop(
 
                 # --- Rule-based risk (always computed from camera features) ---
                 if is_driving_scene:
-                    risk_score, risk_level_str = extractor.rule_based_risk(cam_vec, speed_kmh)
+                    risk_score, risk_level_str, _risk_breakdown = extractor.rule_based_risk(cam_vec, speed_kmh)
                 else:
                     # Non-driving context: show 0 risk, don't mislead
-                    risk_score, risk_level_str = 0.0, "LOW"
+                    risk_score, risk_level_str, _risk_breakdown = 0.0, "LOW", {}
 
                 level_map = {
                     "LOW": RiskLevel.LOW, "MEDIUM": RiskLevel.MEDIUM,
@@ -364,18 +368,32 @@ async def _inference_loop(
                         n_cls = len(proba)
                         weights = np.array([i / max(n_cls - 1, 1) for i in range(n_cls)])
                         model_score = float(np.clip(np.dot(proba, weights), 0.0, 1.0))
-                        risk_score = float(np.clip(0.5 * risk_score + 0.5 * model_score, 0.0, 1.0))
                         confidence = float(proba.max())
-                        if risk_score >= 0.65:
-                            risk_level = RiskLevel.CRITICAL
-                        elif risk_score >= 0.45:
-                            risk_level = RiskLevel.HIGH
-                        elif risk_score >= 0.22:
-                            risk_level = RiskLevel.MEDIUM
-                        else:
-                            risk_level = RiskLevel.LOW
+
+                        # Подмешиваем ML только если модель достаточно уверена
+                        if confidence >= 0.60:
+                            ml_weight = 0.3 + 0.3 * (confidence - 0.6) / 0.4
+                            risk_score = float(np.clip((1 - ml_weight) * risk_score + ml_weight * model_score, 0.0, 1.0))
                     except Exception:
                         pass
+
+                # EMA smoothing
+                if not ema_initialized:
+                    ema_risk_score = risk_score
+                    ema_initialized = True
+                else:
+                    ema_risk_score = EMA_ALPHA * risk_score + (1 - EMA_ALPHA) * ema_risk_score
+                risk_score = ema_risk_score
+
+                # Единый threshold-блок по сглаженному скору
+                if risk_score >= 0.75:
+                    risk_level = RiskLevel.CRITICAL
+                elif risk_score >= 0.55:
+                    risk_level = RiskLevel.HIGH
+                elif risk_score >= 0.30:
+                    risk_level = RiskLevel.MEDIUM
+                else:
+                    risk_level = RiskLevel.LOW
 
                 driving_style_str = "Non-driving" if not is_driving_scene else "Unknown"
                 result = InferenceResult(
