@@ -1,0 +1,16 @@
+# created by virtualenv automatically
+/shelf/
+/workspace.xml
+
+/httpRequests/
+.venv/
+venv/
+33/venv/
+.idea/
+__pycache__/
+*.pyc
+*.pt
+outputs/
+run_log.txt
+data/
+temp/

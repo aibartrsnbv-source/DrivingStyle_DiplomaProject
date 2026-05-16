@@ -1,0 +1,62 @@
+# =============================================================================
+# DRIVING STYLE ML PROJECT - REQUIREMENTS
+# =============================================================================
+# Bachelor Diploma Project:
+# "Developing Machine Learning Algorithms to Assess Driving Style and
+# Predict Accident Risks"
+# =============================================================================
+
+# Core Data Science Libraries
+numpy>=1.21.0
+pandas>=1.3.0
+scipy>=1.7.0
+
+# Machine Learning
+scikit-learn>=1.0.0
+imbalanced-learn>=0.9.0  # For SMOTE and class imbalance handling
+
+# Deep Learning (PyTorch)
+torch>=1.10.0
+torchvision>=0.11.0
+
+# Visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+
+# Optional: XGBoost (recommended)
+xgboost>=1.5.0
+
+# Utilities
+psutil>=5.8.0  # For memory monitoring
+tqdm>=4.62.0   # Progress bars (optional)
+
+# Web Server
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+python-multipart>=0.0.6
+websockets>=11.0
+opencv-python>=4.7.0
+
+# =============================================================================
+# INSTALLATION INSTRUCTIONS
+# =============================================================================
+#
+# Option 1: Install all dependencies
+#   pip install -r requirements.txt
+#
+# Option 2: Create virtual environment first (recommended)
+#   python -m venv venv
+#   source venv/bin/activate  # On Windows: venv\Scripts\activate
+#   pip install -r requirements.txt
+#
+# Option 3: Using conda
+#   conda create -n driving_style python=3.9
+#   conda activate driving_style
+#   pip install -r requirements.txt
+#
+# Note: PyTorch installation may vary depending on your system:
+#   - CPU only: pip install torch
+#   - CUDA 11.8: pip install torch --index-url https://download.pytorch.org/whl/cu118
+#   - Apple Silicon: pip install torch (automatic MPS support)
+#
+# =============================================================================

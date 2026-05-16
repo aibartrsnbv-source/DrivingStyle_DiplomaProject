@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DriveGuard AI — Анализ стиля вождения</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0f;
+      --card:     #12121a;
+      --border:   #1e1e2e;
+      --accent:   #00d4ff;
+      --text:     #e0e0e0;
+      --text-dim: #888;
+      --low:      #00c853;
+      --medium:   #ffd600;
+      --high:     #ff6d00;
+      --critical: #d50000;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+    header p {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .logo-icon { font-size: 1.8rem; }
+
+    /* ── ALERT PANEL ── */
+    #alert-panel {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      padding: 14px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      transform: translateY(-100%);
+      opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    #alert-panel.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    #alert-panel.level-high     { background: var(--high);     color: #fff; }
+    #alert-panel.level-critical { background: var(--critical); color: #fff; }
+
+    @keyframes criticalFlash {
+      0%, 100% { background-color: transparent; }
+      50%       { background-color: rgba(213, 0, 0, 0.15); }
+    }
+    body.critical-active { animation: criticalFlash 0.5s infinite; }
+
+    /* ── CONTROLS ── */
+    .controls-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: flex-end;
+    }
+    .ctrl-group { display: flex; flex-direction: column; gap: 8px; }
+    .ctrl-group label { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      min-width: 200px;
+      cursor: pointer;
+      outline: none;
+    }
+    select:focus { border-color: var(--accent); }
+
+    .source-btns { display: flex; gap: 10px; }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      min-height: 44px;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-outline {
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0,212,255,0.07);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      padding: 12px 28px;
+      font-size: 1rem;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+
+    .btn-danger {
+      background: var(--critical);
+      color: #fff;
+      padding: 12px 28px;
+      font-size: 1rem;
+    }
+    .btn-danger:hover:not(:disabled) { opacity: 0.85; }
+
+    /* ── DROP ZONE ── */
+    #drop-zone {
+      display: none;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px 28px;
+      text-align: center;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      min-width: 260px;
+    }
+    #drop-zone.drag-over { border-color: var(--accent); background: rgba(0,212,255,0.05); }
+    #drop-zone p { font-size: 0.85rem; }
+    #drop-zone .file-info { color: var(--accent); font-weight: 600; margin-top: 6px; font-size: 0.85rem; }
+    #file-input { display: none; }
+
+    /* ── MAIN CONTENT ── */
+    .main-content {
+      display: flex;
+      gap: 16px;
+      padding: 0 24px 24px;
+      flex: 1;
+    }
+
+    /* ── LEFT COLUMN ── */
+    .video-col {
+      flex: 0 0 60%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .canvas-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    #video-canvas {
+      display: block;
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #05050a;
+    }
+
+    .video-actions { display: flex; gap: 12px; }
+
+    /* ── RIGHT COLUMN ── */
+    .stats-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    /* ── RISK CIRCLE ── */
+    .risk-card { align-items: center; display: flex; flex-direction: column; }
+    .risk-circle-wrap {
+      position: relative;
+      width: 150px; height: 150px;
+      margin: 0 auto 12px;
+    }
+    .risk-circle-wrap svg { transform: rotate(-90deg); }
+    #risk-track { fill: none; stroke: var(--border); stroke-width: 10; }
+    #risk-fill  {
+      fill: none;
+      stroke: var(--low);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 408;
+      stroke-dashoffset: 408;
+      transition: stroke-dashoffset 0.4s ease, stroke 0.4s ease;
+    }
+    .risk-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    #risk-score-val {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--low);
+      transition: color 0.4s;
+      line-height: 1;
+    }
+    #risk-score-pct { font-size: 0.7rem; color: var(--text-dim); }
+
+    #risk-label {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--low);
+      transition: color 0.4s;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── METRICS ── */
+    .metrics-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-name { font-size: 0.85rem; color: var(--text-dim); }
+    .metric-val  { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+
+    /* ── STATUS BAR ── */
+    #status-bar {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 8px 24px;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .status-dot.active { background: var(--low); animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    /* ── WARNING BANNER ── */
+    #model-warning {
+      display: none;
+      background: rgba(255,214,0,0.1);
+      border: 1px solid var(--medium);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      color: var(--medium);
+      margin: 0 24px 0;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .main-content { flex-direction: column; padding: 0 12px 16px; }
+      .video-col    { flex: none; width: 100%; }
+      .controls-panel { margin: 12px; flex-direction: column; }
+      #model-warning { margin: 0 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ALERT PANEL -->
+<div id="alert-panel"></div>
+
+<!-- HEADER -->
+<header>
+  <span class="logo-icon">🚗</span>
+  <div>
+    <h1>DriveGuard AI</h1>
+    <p>Система анализа стиля вождения и предсказания рисков ДТП</p>
+  </div>
+</header>
+
+<!-- MODEL WARNING -->
+<div id="model-warning">
+  ⚠ Обученные модели не найдены. Сначала обучите модели: <code>python main.py --synthetic</code>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls-panel">
+  <div class="ctrl-group">
+    <label>Модель ML</label>
+    <select id="model-select">
+      <option value="">— Загрузка... —</option>
+    </select>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Источник видео</label>
+    <div class="source-btns">
+      <button class="btn btn-outline" id="btn-camera" onclick="selectSource('camera')">📷 USB Камера</button>
+      <button class="btn btn-outline" id="btn-video"  onclick="selectSource('video')">📁 Загрузить видео</button>
+    </div>
+  </div>
+
+  <div class="ctrl-group" id="drop-zone-wrap" style="display:none">
+    <label>Видеофайл</label>
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()"
+         ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <p>Перетащите файл или нажмите для выбора</p>
+      <p style="font-size:0.75rem;margin-top:4px">MP4, AVI, MOV, MKV</p>
+      <div class="file-info" id="file-info"></div>
+    </div>
+    <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv" onchange="onFileChange(event)" />
+  </div>
+
+  <div class="ctrl-group">
+    <button class="btn btn-primary" id="btn-start" onclick="startAnalysis()" disabled>▶ Начать анализ</button>
+    <button class="btn btn-danger"  id="btn-stop"  onclick="stopAnalysis()" style="display:none">⏹ Остановить</button>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main-content">
+
+  <!-- LEFT: VIDEO -->
+  <div class="video-col">
+    <div class="canvas-wrap">
+      <canvas id="video-canvas" width="640" height="480"></canvas>
+    </div>
+    <div class="video-actions" id="video-actions" style="display:none">
+      <!-- пусто, кнопка стоп уже в controls -->
+    </div>
+  </div>
+
+  <!-- RIGHT: STATS -->
+  <div class="stats-col">
+
+    <!-- Risk level card -->
+    <div class="card risk-card">
+      <div class="card-title">Уровень риска</div>
+      <div class="risk-circle-wrap">
+        <svg width="150" height="150" viewBox="0 0 150 150">
+          <circle id="risk-track" cx="75" cy="75" r="65" />
+          <circle id="risk-fill"  cx="75" cy="75" r="65" />
+        </svg>
+        <div class="risk-center">
+          <div id="risk-score-val">—</div>
+          <div id="risk-score-pct">риск</div>
+        </div>
+      </div>
+      <div id="risk-label">ОЖИДАНИЕ</div>
+    </div>
+
+    <!-- Metrics card -->
+    <div class="card">
+      <div class="card-title">Показатели</div>
+      <div class="metrics-grid">
+        <div class="metric-row"><span class="metric-name">Скорость</span>       <span class="metric-val" id="m-speed">—</span></div>
+        <div class="metric-row"><span class="metric-name">Резких торможений</span><span class="metric-val" id="m-brakes">—</span></div>
+        <div class="metric-row"><span class="metric-name">Резких разгонов</span> <span class="metric-val" id="m-accels">—</span></div>
+        <div class="metric-row"><span class="metric-name">Дистанция</span>       <span class="metric-val" id="m-dist">—</span></div>
+        <div class="metric-row"><span class="metric-name">Смен полосы</span>     <span class="metric-val" id="m-lanes">—</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <div class="status-dot" id="status-dot"></div>
+  <span id="status-text">Ожидание...</span>
+</div>
+
+<script>
+// ─────────────────── Константы ───────────────────
+const RISK_COLORS = { LOW:'#00c853', MEDIUM:'#ffd600', HIGH:'#ff6d00', CRITICAL:'#d50000' };
+const RISK_LABELS = { LOW:'НИЗКИЙ', MEDIUM:'СРЕДНИЙ', HIGH:'ВЫСОКИЙ', CRITICAL:'КРИТИЧЕСКИЙ' };
+const ALERT_MESSAGES = {
+  HIGH:     '⚠️ Высокий риск ДТП! Соблюдайте дистанцию и снизьте скорость',
+  CRITICAL: '🚨 КРИТИЧЕСКАЯ УГРОЗА! Немедленно снизьте скорость!'
+};
+const CIRCUMFERENCE = 2 * Math.PI * 65; // ≈ 408.4
+
+// ─────────────────── Состояние ───────────────────
+let ws            = null;
+let sessionId     = null;
+let selectedSource = null;   // 'camera' | 'video'
+let uploadedVideoId = null;
+let alertTimeout  = null;
+
+// ─────────────────── Инициализация ───────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  drawPlaceholder();
+  loadModels();
+});
+
+async function loadModels() {
+  try {
+    const res  = await fetch('/api/models');
+    const data = await res.json();
+    const sel  = document.getElementById('model-select');
+    sel.innerHTML = '';
+    if (!data.models || data.models.length === 0) {
+      document.getElementById('model-warning').style.display = 'block';
+      sel.innerHTML = '<option value="">— Модели не найдены —</option>';
+    } else {
+      data.models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        sel.appendChild(opt);
+      });
+    }
+    checkStartReady();
+  } catch (e) {
+    setStatus('Ошибка подключения к серверу');
+  }
+}
+
+// ─────────────────── Выбор источника ───────────────────
+function selectSource(src) {
+  selectedSource = src;
+  document.getElementById('btn-camera').classList.toggle('active', src === 'camera');
+  document.getElementById('btn-video').classList.toggle('active',  src === 'video');
+  document.getElementById('drop-zone-wrap').style.display = src === 'video' ? 'flex' : 'none';
+  document.getElementById('drop-zone').style.display      = src === 'video' ? 'block' : 'none';
+  if (src === 'camera') uploadedVideoId = null;
+  checkStartReady();
+}
+
+function checkStartReady() {
+  const model = document.getElementById('model-select').value;
+  const ready = model && selectedSource && (selectedSource === 'camera' || uploadedVideoId);
+  document.getElementById('btn-start').disabled = !ready;
+}
+
+// ─────────────────── Drag & Drop ───────────────────
+function onDragOver(e)  { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
+function onDragLeave(e) { document.getElementById('drop-zone').classList.remove('drag-over'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+}
+function onFileChange(e) { const f = e.target.files[0]; if (f) uploadFile(f); }
+
+async function uploadFile(file) {
+  document.getElementById('file-info').textContent = `Загрузка: ${file.name}...`;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res  = await fetch('/api/upload-video', { method:'POST', body: form });
+    const data = await res.json();
+    uploadedVideoId = data.video_id;
+    document.getElementById('file-info').textContent = `✓ ${file.name}`;
+    setStatus('Файл загружен, готов к запуску');
+    checkStartReady();
+  } catch (e) {
+    document.getElementById('file-info').textContent = '✗ Ошибка загрузки';
+  }
+}
+
+// ─────────────────── WebSocket ───────────────────
+function startAnalysis() {
+  sessionId = crypto.randomUUID();
+  const wsUrl = `ws://${location.host}/ws/${sessionId}`;
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    const model = document.getElementById('model-select').value;
+    const cmd   = { action:'start', source: selectedSource, model };
+    if (selectedSource === 'video') cmd.video_id = uploadedVideoId;
+    ws.send(JSON.stringify(cmd));
+
+    document.getElementById('btn-start').style.display = 'none';
+    document.getElementById('btn-stop').style.display  = 'inline-flex';
+    document.getElementById('status-dot').classList.add('active');
+    setStatus('Запуск...');
+  };
+
+  ws.onmessage = (event) => {
+    let data;
+    try { data = JSON.parse(event.data); } catch { return; }
+
+    if (data.type === 'frame')   handleFrame(data);
+    if (data.type === 'alert')   showAlert(data.risk_level, data.message);
+    if (data.type === 'status')  setStatus(data.message);
+    if (data.type === 'error')   { setStatus('Ошибка: ' + data.message); showErrorBanner(data.message); }
+    if (data.type === 'stopped') resetUI();
+  };
+
+  ws.onerror = () => setStatus('Ошибка WebSocket соединения');
+  ws.onclose = () => {
+    document.getElementById('status-dot').classList.remove('active');
+  };
+}
+
+function stopAnalysis() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ action:'stop' }));
+  }
+  resetUI();
+}
+
+// ─────────────────── Обработка кадра ───────────────────
+const canvas = document.getElementById('video-canvas');
+const ctx    = canvas.getContext('2d');
+
+function handleFrame(data) {
+  // Рисуем изображение
+  const img = new Image();
+  img.onload = () => {
+    canvas.width  = img.width  || 640;
+    canvas.height = img.height || 480;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  };
+  img.src = 'data:image/jpeg;base64,' + data.image;
+
+  updateRiskDisplay(data.risk_score, data.risk_level);
+  updateMetrics(data);
+
+  if (data.risk_level === 'HIGH' || data.risk_level === 'CRITICAL') {
+    showAlert(data.risk_level);
+  } else {
+    hideAlert();
+  }
+}
+
+// ─────────────────── Риск-дисплей ───────────────────
+function updateRiskDisplay(score, level) {
+  const color  = RISK_COLORS[level] || '#888';
+  const label  = RISK_LABELS[level] || level;
+  const offset = CIRCUMFERENCE * (1 - Math.min(Math.max(score, 0), 1));
+
+  document.getElementById('risk-fill').style.strokeDashoffset = offset;
+  document.getElementById('risk-fill').style.stroke           = color;
+  document.getElementById('risk-score-val').textContent       = score.toFixed(2);
+  document.getElementById('risk-score-val').style.color       = color;
+  document.getElementById('risk-label').textContent           = label;
+  document.getElementById('risk-label').style.color           = color;
+}
+
+function updateMetrics(data) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('m-speed',  data.speed_kmh   != null ? data.speed_kmh.toFixed(1) + ' км/ч' : '—');
+  set('m-brakes', data.harsh_brakes   != null ? data.harsh_brakes : '—');
+  set('m-accels', data.harsh_accels   != null ? data.harsh_accels : '—');
+  set('m-dist',   data.following_distance != null ? data.following_distance.toFixed(1) + ' м' : '—');
+  set('m-lanes',  data.lane_changes   != null ? data.lane_changes : '—');
+}
+
+// ─────────────────── Оповещения ───────────────────
+let lastAlertLevel = null;
+
+function showAlert(level, message) {
+  const panel = document.getElementById('alert-panel');
+  panel.textContent = message || ALERT_MESSAGES[level] || '';
+  panel.className   = 'visible level-' + level.toLowerCase();
+
+  if (level === 'CRITICAL') {
+    document.body.classList.add('critical-active');
+    if (lastAlertLevel !== 'CRITICAL') playAlert(true);
+  } else {
+    document.body.classList.remove('critical-active');
+    if (lastAlertLevel !== 'HIGH') playAlert(false);
+  }
+  lastAlertLevel = level;
+
+  clearTimeout(alertTimeout);
+  if (level === 'HIGH') {
+    alertTimeout = setTimeout(hideAlert, 4000);
+  }
+}
+
+function hideAlert() {
+  const panel = document.getElementById('alert-panel');
+  panel.className = '';
+  document.body.classList.remove('critical-active');
+  lastAlertLevel = null;
+}
+
+function showErrorBanner(msg) {
+  const panel = document.getElementById('alert-panel');
+  panel.textContent = '❌ ' + msg;
+  panel.className   = 'visible';
+  panel.style.background = '#333';
+  clearTimeout(alertTimeout);
+  alertTimeout = setTimeout(() => { panel.className = ''; panel.style.background = ''; }, 5000);
+}
+
+function playAlert(isCritical) {
+  try {
+    const actx      = new (window.AudioContext || window.webkitAudioContext)();
+    const osc       = actx.createOscillator();
+    const gainNode  = actx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(actx.destination);
+    osc.frequency.value = isCritical ? 880 : 440;
+    osc.type            = 'square';
+    const dur = isCritical ? 0.5 : 0.2;
+    gainNode.gain.setValueAtTime(0.3, actx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+    osc.start();
+    osc.stop(actx.currentTime + dur);
+  } catch {}
+}
+
+// ─────────────────── Статус ───────────────────
+function setStatus(msg) {
+  document.getElementById('status-text').textContent = msg;
+}
+
+// ─────────────────── Сброс UI ───────────────────
+function resetUI() {
+  document.getElementById('btn-start').style.display = 'inline-flex';
+  document.getElementById('btn-stop').style.display  = 'none';
+  document.getElementById('status-dot').classList.remove('active');
+  setStatus('Ожидание...');
+  hideAlert();
+  if (ws) { ws.close(); ws = null; }
+  drawPlaceholder();
+}
+
+// ─────────────────── Canvas placeholder ───────────────────
+function drawPlaceholder() {
+  canvas.width  = 640;
+  canvas.height = 480;
+  ctx.fillStyle = '#05050a';
+  ctx.fillRect(0, 0, 640, 480);
+
+  // Иконка камеры
+  ctx.strokeStyle = '#1e1e2e';
+  ctx.lineWidth   = 3;
+  ctx.fillStyle   = '#1e1e2e';
+  const cx = 320, cy = 220, w = 100, h = 68, r = 10;
+  // корпус камеры
+  ctx.beginPath();
+  ctx.roundRect(cx - w/2, cy - h/2, w, h, r);
+  ctx.fill();
+  // линза
+  ctx.fillStyle = '#0a0a0f';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  // вспышка
+  ctx.fillStyle = '#1e1e2e';
+  ctx.fillRect(cx + 28, cy - 28, 14, 10);
+
+  ctx.fillStyle   = '#444';
+  ctx.font        = '16px Inter, sans-serif';
+  ctx.textAlign   = 'center';
+  ctx.fillText('Подключите источник видео', cx, cy + 68);
+  ctx.font        = '13px Inter, sans-serif';
+  ctx.fillStyle   = '#333';
+  ctx.fillText('Выберите камеру или загрузите видеофайл', cx, cy + 92);
+}
+</script>
+</body>
+</html>
