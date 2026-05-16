@@ -291,7 +291,10 @@ async def _inference_loop(
                 harsh_accel=int(flow_delta > CameraFeatureExtractor.HARSH_ACCEL_THRESH),
                 close_follow=close_follow,
             )
-            extractor.update(frame_feat)
+            if flow_estimator.last_fx is not None:
+                extractor.update_with_flow(frame_feat, flow_estimator.last_fx)
+            else:
+                extractor.update(frame_feat)
 
             risk_score = 0.0
             risk_level = RiskLevel.LOW
@@ -400,7 +403,7 @@ async def _inference_loop(
                 "speed_kmh": round(speed_kmh, 1),
                 "harsh_brakes": harsh_brakes,
                 "harsh_accels": harsh_accels,
-                "following_distance": round(following_distance, 1) if following_distance >= 0 else "N/A",
+                "following_distance": round(following_distance, 1) if following_distance >= 0 else -1,
                 "lane_changes": lane_changes,
                 "timestamp": now,
             })
