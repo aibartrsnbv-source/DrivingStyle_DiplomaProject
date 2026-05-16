@@ -1,6 +1,12 @@
 import matplotlib
 matplotlib.use("Agg")  # ОБЯЗАТЕЛЬНО ПЕРВЫМ — фикс для работы без GUI-дисплея
 
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+
 import asyncio
 import base64
 import json
@@ -424,4 +430,4 @@ async def _inference_loop(
 # ───────────────────────────── Запуск ──────────────────────────────────
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8000, ws="wsproto", reload=False)
