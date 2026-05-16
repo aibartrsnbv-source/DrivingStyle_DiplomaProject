@@ -596,11 +596,12 @@ function updateRiskDisplay(score, level) {
 
 function updateMetrics(data) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  set('m-speed',  data.speed_kmh   != null ? data.speed_kmh.toFixed(1) + ' км/ч' : '—');
-  set('m-brakes', data.harsh_brakes   != null ? data.harsh_brakes : '—');
-  set('m-accels', data.harsh_accels   != null ? data.harsh_accels : '—');
-  set('m-dist',   data.following_distance != null ? data.following_distance.toFixed(1) + ' м' : '—');
-  set('m-lanes',  data.lane_changes   != null ? data.lane_changes : '—');
+  set('m-speed',  typeof data.speed_kmh === 'number' ? data.speed_kmh.toFixed(1) + ' км/ч' : '—');
+  set('m-brakes', typeof data.harsh_brakes === 'number' ? data.harsh_brakes : '—');
+  set('m-accels', typeof data.harsh_accels === 'number' ? data.harsh_accels : '—');
+  set('m-dist',   (typeof data.following_distance === 'number' && data.following_distance >= 0)
+                    ? data.following_distance.toFixed(1) + ' м' : '—');
+  set('m-lanes',  typeof data.lane_changes === 'number' ? data.lane_changes : '—');
 }
 
 // ─────────────────── Оповещения ───────────────────
