@@ -168,24 +168,30 @@ ML_MODELS_CONFIG = {
     },
 
     "gradient_boosting": {
+        # Optuna v3 (TPE, 50 trials, GroupKFold by trip_id, f1_macro)
+        # Honest test F1-macro: 0.5723 (was 0.5652 baseline, +0.7%)
+        # Feature engineering v3: 7 interactions, dropped 8 dup features
         "n_estimators": 250,
-        "learning_rate": 0.05,              # lower LR + more trees works better
-        "max_depth": 4,                     # was 5 — less overfitting
-        "min_samples_split": 10,
-        "min_samples_leaf": 5,
-        "subsample": 0.8,                   # stochastic GB
-        "max_features": "sqrt",
+        "learning_rate": 0.1355,
+        "max_depth": 5,
+        "min_samples_split": 2,
+        "min_samples_leaf": 2,
+        "subsample": 0.7579,
+        "max_features": "log2",
         "random_state": RANDOM_SEED,
     },
 
     "xgboost": {
-        "n_estimators": 250,                # slightly more trees
-        "learning_rate": 0.08,              # compromise between 0.1 and 0.05
-        "max_depth": 5,                     # was 4 in iter-2 (too shallow), 6 originally — 5 is sweet spot
-        "min_child_weight": 2,              # light regularization
-        "subsample": 0.85,
-        "colsample_bytree": 0.85,
-        "reg_lambda": 1.0,                  # keep L2, drop L1 (gamma, reg_alpha removed — too aggressive)
+        # Optuna v3 (TPE, 50 trials, GroupKFold by trip_id, f1_macro)
+        # Honest test F1-macro: 0.6298 (was 0.5858 baseline, +4.4%)
+        # Best overall model — XGBoost wins on V3 feature set
+        "n_estimators": 300,
+        "max_depth": 5,
+        "learning_rate": 0.1650,
+        "subsample": 0.7725,
+        "colsample_bytree": 0.8750,
+        "min_child_weight": 3,
+        "reg_lambda": 0.6490,
         "random_state": RANDOM_SEED,
         "eval_metric": "mlogloss",
     },
