@@ -217,13 +217,29 @@ async def _inference_loop(
         await send({"type": "status", "message": "Инициализация камеры..." if source == "camera" else "Открытие видеофайла..."})
 
         if source == "camera":
-            cap = cv2.VideoCapture(0)
+            # Пытаемся найти iPhone через iVCam (обычно камера #1 если есть встроенная вебка).
+            # Перебираем индексы 1, 2, 0 — сначала внешние, потом встроенная как fallback.
+            cap = None
+            for cam_idx in [1, 2, 0]:
+                test_cap = cv2.VideoCapture(cam_idx)
+                if test_cap.isOpened():
+                    ret, _ = test_cap.read()
+                    if ret:
+                        cap = test_cap
+                        await send({"type": "status", "message": f"Камера открыта (index={cam_idx})"})
+                        break
+                    test_cap.release()
+                else:
+                    test_cap.release()
+
+            if cap is None:
+                await send({"type": "error", "message": "Не удалось найти ни одну рабочую камеру"})
+                return
         else:
             cap = cv2.VideoCapture(video_path)
-
-        if not cap.isOpened():
-            await send({"type": "error", "message": "Не удалось открыть источник видео"})
-            return
+            if not cap.isOpened():
+                await send({"type": "error", "message": "Не удалось открыть видеофайл"})
+                return
 
         await send({"type": "status", "message": "Анализ запущен..."})
 
@@ -247,6 +263,11 @@ async def _inference_loop(
         ema_risk_score = 0.0
         EMA_ALPHA = 0.15
         ema_initialized = False
+
+        # EMA-сглаживание скорости (alpha=0.10 → лаг ~10 кадров)
+        ema_speed_kmh = 0.0
+        EMA_ALPHA_SPEED = 0.05
+        ema_speed_initialized = False
 
         while not stop_event.is_set():
             ret, frame = cap.read()
@@ -335,9 +356,18 @@ async def _inference_loop(
 
                 # --- Speed: only meaningful in a driving scene ---
                 if is_driving_scene:
-                    speed_kmh = float(cam_vec[0]) * adapter.flow_to_kmh * adapter.fps
+                    raw_speed_kmh = float(cam_vec[0]) * adapter.flow_to_kmh * adapter.fps
+                    # EMA-сглаживание чтобы скорость не дёргалась кадр-в-кадр
+                    if not ema_speed_initialized:
+                        ema_speed_kmh = raw_speed_kmh
+                        ema_speed_initialized = True
+                    else:
+                        ema_speed_kmh = EMA_ALPHA_SPEED * raw_speed_kmh + (1 - EMA_ALPHA_SPEED) * ema_speed_kmh
+                    speed_kmh = ema_speed_kmh
                 else:
                     speed_kmh = 0.0
+                    # Сброс сглаживания, чтобы при возврате на дорогу не было артефакта
+                    ema_speed_initialized = False
 
                 # --- Following distance: only when a vehicle is visible ---
                 la = float(cam_vec[12])  # leading_area_mean

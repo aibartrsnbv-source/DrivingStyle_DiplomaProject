@@ -91,7 +91,9 @@ MIN_WINDOW = 10
 # Optimization constants
 FLOW_RESIZE = (320, 240)   # compute optical flow on reduced frame
 YOLO_SKIP_FRAMES = 3       # run YOLO every N frames
-FLOW_TO_KMH = 0.44         # empirical calibration: px/frame → km/h
+FLOW_TO_KMH = 1.2          # recalibrated on real dashcam footage (24fps, 4K).
+                            # Previous 0.44 underestimated speed by factor ~2.77.
+                            # Verified empirically: UI shows ~23 km/h while real speed is ~65 km/h.
 
 # ---------------------------------------------------------------------------
 # Feature name lists — single source of truth
