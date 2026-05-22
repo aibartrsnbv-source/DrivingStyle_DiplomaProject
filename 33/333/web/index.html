@@ -310,6 +310,25 @@
       margin: 0 24px 0;
     }
 
+    /* ── CONDITIONS ── */
+    .conditions-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cond-btn {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    .cond-btn:hover { border-color: var(--accent); }
+    .cond-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 768px) {
       .main-content { flex-direction: column; padding: 0 12px 16px; }
@@ -352,6 +371,16 @@
     <div class="source-btns">
       <button class="btn btn-outline" id="btn-camera" onclick="selectSource('camera')">📷 USB Камера</button>
       <button class="btn btn-outline" id="btn-video"  onclick="selectSource('video')">📁 Загрузить видео</button>
+    </div>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Условия</label>
+    <div class="conditions-row">
+      <button class="cond-btn active" data-cond="dry">Сухо</button>
+      <button class="cond-btn" data-cond="rain">Дождь</button>
+      <button class="cond-btn" data-cond="snow">Снег</button>
+      <button class="cond-btn" data-cond="night">Ночь</button>
     </div>
   </div>
 
@@ -441,6 +470,7 @@ let sessionId     = null;
 let selectedSource = null;   // 'camera' | 'video'
 let uploadedVideoId = null;
 let alertTimeout  = null;
+let activeConditions = ['dry'];
 
 // ─────────────────── Инициализация ───────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -522,7 +552,7 @@ function startAnalysis() {
 
   ws.onopen = () => {
     const model = document.getElementById('model-select').value;
-    const cmd   = { action:'start', source: selectedSource, model };
+    const cmd   = { action:'start', source: selectedSource, model, conditions: activeConditions };
     if (selectedSource === 'video') cmd.video_id = uploadedVideoId;
     ws.send(JSON.stringify(cmd));
 
@@ -675,6 +705,28 @@ function resetUI() {
   if (ws) { ws.close(); ws = null; }
   drawPlaceholder();
 }
+
+// ─────────────────── Контекстные условия ───────────────────
+document.querySelectorAll('.cond-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cond = btn.dataset.cond;
+    if (cond === 'dry') {
+      activeConditions = ['dry'];
+      document.querySelectorAll('.cond-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.cond === 'dry');
+      });
+    } else {
+      btn.classList.toggle('active');
+      document.querySelector('.cond-btn[data-cond="dry"]').classList.remove('active');
+      activeConditions = Array.from(document.querySelectorAll('.cond-btn.active'))
+        .map(b => b.dataset.cond);
+      if (activeConditions.length === 0) {
+        activeConditions = ['dry'];
+        document.querySelector('.cond-btn[data-cond="dry"]').classList.add('active');
+      }
+    }
+  });
+});
 
 // ─────────────────── Canvas placeholder ───────────────────
 function drawPlaceholder() {

@@ -148,6 +148,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 source = cmd.get("source", "camera")
                 model_name = cmd.get("model", "")
                 video_id = cmd.get("video_id")
+                conditions = cmd.get("conditions", [])  # список строк: ["rain", "night"] и т.п.
 
                 if not CAMERA_INFERENCE_AVAILABLE:
                     await send({"type": "error", "message": "Модуль camera_inference недоступен. Убедитесь что он существует в src/"})
@@ -177,7 +178,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
                 def run_inference():
                     asyncio.run_coroutine_threadsafe(
-                        _inference_loop(websocket, send, source, model_path, video_path, current_stop, loop),
+                        _inference_loop(websocket, send, source, model_path, video_path, current_stop, loop, conditions),
                         loop
                     )
 
@@ -202,6 +203,7 @@ async def _inference_loop(
     video_path: str | None,
     stop_event: threading.Event,
     loop,
+    conditions: list = None,
 ):
     """Основной цикл инференса (выполняется в потоке через ThreadPoolExecutor)."""
     cap = None
@@ -268,6 +270,21 @@ async def _inference_loop(
         ema_speed_kmh = 0.0
         EMA_ALPHA_SPEED = 0.05
         ema_speed_initialized = False
+
+        # Контекстный риск: множитель чувствительности по дорожным условиям
+        CONDITION_MULTIPLIERS = {
+            "dry": 1.0,
+            "rain": 1.4,
+            "snow": 1.6,
+            "night": 1.25,
+        }
+        _conditions = conditions or []
+        context_multiplier = 1.0
+        for cond in _conditions:
+            context_multiplier *= CONDITION_MULTIPLIERS.get(cond, 1.0)
+        context_multiplier = min(context_multiplier, 2.0)  # потолок
+        if _conditions and context_multiplier > 1.0:
+            await send({"type": "status", "message": f"Условия: {', '.join(_conditions)} (×{context_multiplier:.2f})"})
 
         while not stop_event.is_set():
             ret, frame = cap.read()
@@ -407,6 +424,9 @@ async def _inference_loop(
                     except Exception:
                         pass
 
+                # Контекстный риск: усиливаем по дорожным условиям
+                risk_score = float(np.clip(risk_score * context_multiplier, 0.0, 1.0))
+
                 # EMA smoothing
                 if not ema_initialized:
                     ema_risk_score = risk_score
@@ -460,6 +480,8 @@ async def _inference_loop(
                 "following_distance": round(following_distance, 1) if following_distance >= 0 else -1,
                 "lane_changes": lane_changes,
                 "timestamp": now,
+                "context_multiplier": round(context_multiplier, 2),
+                "active_conditions": _conditions,
             })
 
             if level_val in ("HIGH", "CRITICAL"):
