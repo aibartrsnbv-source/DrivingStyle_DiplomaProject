@@ -1,485 +1,705 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DriveGuard AI — Анализ стиля вождения</title>
+  <title>DriveGuard AI</title>
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* ── RESET ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* ── THEME VARIABLES ── */
     :root {
-      --bg:       #0a0a0f;
-      --card:     #12121a;
-      --border:   #1e1e2e;
-      --accent:   #00d4ff;
-      --text:     #e0e0e0;
-      --text-dim: #888;
-      --low:      #00c853;
-      --medium:   #ffd600;
-      --high:     #ff6d00;
-      --critical: #d50000;
+      --bg:           #0E0F13;
+      --panel:        #16181F;
+      --panel-alt:    #1E212B;
+      --border:       #2A2E3A;
+      --text:         #E8EAED;
+      --text-dim:     #8A8F9C;
+      --accent:       #FF7A1A;
+      --accent-hover: #FF8F3D;
+      --risk-low:     #34D399;
+      --risk-medium:  #FBBF24;
+      --risk-high:    #FB923C;
+      --risk-critical:#EF4444;
+      --shadow:       rgba(0,0,0,0.4);
+      --accent-subtle: rgba(255,122,26,0.10);
+    }
+    [data-theme="light"] {
+      --bg:           #F4F5F7;
+      --panel:        #FFFFFF;
+      --panel-alt:    #F0F1F4;
+      --border:       #E2E4E9;
+      --text:         #1A1C22;
+      --text-dim:     #6B7280;
+      --accent:       #EA6A0C;
+      --accent-hover: #D25E08;
+      --risk-low:     #059669;
+      --risk-medium:  #D97706;
+      --risk-high:    #EA580C;
+      --risk-critical:#DC2626;
+      --shadow:       rgba(0,0,0,0.08);
+      --accent-subtle: rgba(234,106,12,0.10);
     }
 
+    /* ── BASE ── */
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: Inter, system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
     /* ── HEADER ── */
-    header {
-      background: var(--card);
+    .app-header {
+      background: var(--panel);
       border-bottom: 1px solid var(--border);
-      padding: 16px 24px;
+      padding: 0 24px;
+      height: 56px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
+      flex-shrink: 0;
     }
-    header h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: 0.02em;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-    header p {
-      font-size: 0.8rem;
+    .brand-icon {
+      width: 34px; height: 34px;
+      background: var(--accent);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .brand-name {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .brand-sub {
+      font-size: 11px;
       color: var(--text-dim);
     }
-    .logo-icon { font-size: 1.8rem; }
+    /* Theme toggle */
+    .theme-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .theme-btn:hover { color: var(--text); border-color: var(--text-dim); }
+    .ti-sun  { display: none; }
+    .ti-moon { display: none; }
+    [data-theme="dark"]  .ti-sun  { display: block; } /* dark → show sun to switch to light */
+    [data-theme="light"] .ti-moon { display: block; } /* light → show moon to switch to dark */
 
     /* ── ALERT PANEL ── */
     #alert-panel {
       position: fixed;
       top: 0; left: 0; right: 0;
       z-index: 1000;
-      padding: 14px 24px;
-      font-size: 1rem;
+      padding: 12px 24px;
+      font-size: 14px;
       font-weight: 600;
       text-align: center;
       transform: translateY(-100%);
       opacity: 0;
-      transition: transform 0.3s ease, opacity 0.3s ease;
+      transition: transform 0.25s ease, opacity 0.25s ease;
     }
-    #alert-panel.visible {
-      transform: translateY(0);
-      opacity: 1;
-    }
-    #alert-panel.level-high     { background: var(--high);     color: #fff; }
-    #alert-panel.level-critical { background: var(--critical); color: #fff; }
-
+    #alert-panel.visible   { transform: translateY(0); opacity: 1; }
+    #alert-panel.level-high     { background: var(--risk-high);     color: #fff; }
+    #alert-panel.level-critical { background: var(--risk-critical); color: #fff; }
     @keyframes criticalFlash {
       0%, 100% { background-color: transparent; }
-      50%       { background-color: rgba(213, 0, 0, 0.15); }
+      50%       { background-color: rgba(239, 68, 68, 0.12); }
     }
     body.critical-active { animation: criticalFlash 0.5s infinite; }
 
-    /* ── CONTROLS ── */
-    .controls-panel {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin: 16px 24px;
+    /* ── MODEL WARNING ── */
+    #model-warning {
+      display: none;
+      background: rgba(251,191,36,0.08);
+      border: 1px solid var(--risk-medium);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: var(--risk-medium);
+      margin: 12px 24px 0;
+    }
+
+    /* ── CONTROLS BAR ── */
+    .controls-bar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
       display: flex;
       flex-wrap: wrap;
-      gap: 20px;
+      gap: 14px;
       align-items: flex-end;
     }
-    .ctrl-group { display: flex; flex-direction: column; gap: 8px; }
-    .ctrl-group label { font-size: 0.78rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .ctrl-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .ctrl-label {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-dim);
+    }
 
-    select {
-      background: var(--bg);
+    /* Model select */
+    #model-select {
+      background: var(--panel-alt);
       color: var(--text);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 0.9rem;
-      min-width: 200px;
+      padding: 7px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      min-width: 190px;
       cursor: pointer;
       outline: none;
+      transition: border-color 0.15s;
     }
-    select:focus { border-color: var(--accent); }
+    #model-select:focus { border-color: var(--accent); }
 
-    .source-btns { display: flex; gap: 10px; }
+    /* Source buttons — keep class active toggleable by JS */
+    .source-btns { display: flex; gap: 6px; }
+    .src-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 12px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .src-btn:hover { color: var(--text); border-color: var(--text-dim); }
+    .src-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+    }
 
-    .btn {
+    /* Condition buttons */
+    .cond-row { display: flex; gap: 5px; flex-wrap: wrap; }
+    .cond-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 6px 10px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cond-btn:hover { color: var(--text); border-color: var(--text-dim); }
+    .cond-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+    }
+
+    /* Action buttons */
+    .action-btns { display: flex; gap: 8px; }
+    #btn-start {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 8px 20px;
+      background: var(--accent);
+      color: #fff;
       border: none;
       border-radius: 8px;
-      padding: 10px 18px;
-      font-size: 0.9rem;
+      font-size: 14px;
       font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
-      transition: opacity 0.2s, transform 0.1s;
-      min-height: 44px;
+      transition: background 0.15s;
+      white-space: nowrap;
+      min-height: 36px;
     }
-    .btn:active { transform: scale(0.97); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-
-    .btn-outline {
-      background: transparent;
-      border: 1.5px solid var(--border);
-      color: var(--text);
-    }
-    .btn-outline.active {
-      border-color: var(--accent);
-      color: var(--accent);
-      background: rgba(0,212,255,0.07);
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #000;
-      font-weight: 700;
-      padding: 12px 28px;
-      font-size: 1rem;
-    }
-    .btn-primary:hover:not(:disabled) { opacity: 0.85; }
-
-    .btn-danger {
-      background: var(--critical);
+    #btn-start:hover:not(:disabled) { background: var(--accent-hover); }
+    #btn-start:disabled { opacity: 0.4; cursor: not-allowed; }
+    #btn-stop {
+      display: none;
+      align-items: center; gap: 7px;
+      padding: 8px 20px;
+      background: var(--risk-critical);
       color: #fff;
-      padding: 12px 28px;
-      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+      min-height: 36px;
     }
-    .btn-danger:hover:not(:disabled) { opacity: 0.85; }
+    #btn-stop:hover { opacity: 0.88; }
 
-    /* ── DROP ZONE ── */
+    /* Drop zone */
+    #drop-zone-wrap { display: none; }
     #drop-zone {
       display: none;
       border: 2px dashed var(--border);
-      border-radius: 10px;
-      padding: 20px 28px;
+      border-radius: 8px;
+      padding: 10px 16px;
       text-align: center;
       color: var(--text-dim);
       cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      min-width: 260px;
+      transition: border-color 0.15s, background 0.15s;
+      min-width: 210px;
+      font-size: 12px;
     }
-    #drop-zone.drag-over { border-color: var(--accent); background: rgba(0,212,255,0.05); }
-    #drop-zone p { font-size: 0.85rem; }
-    #drop-zone .file-info { color: var(--accent); font-weight: 600; margin-top: 6px; font-size: 0.85rem; }
+    #drop-zone.drag-over { border-color: var(--accent); background: var(--accent-subtle); }
+    .file-info { color: var(--accent); font-weight: 500; margin-top: 3px; font-size: 12px; }
     #file-input { display: none; }
 
-    /* ── MAIN CONTENT ── */
-    .main-content {
-      display: flex;
+    /* ── MAIN LAYOUT ── */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 62fr 38fr;
       gap: 16px;
-      padding: 0 24px 24px;
+      padding: 16px 24px 24px;
       flex: 1;
+      min-height: 0;
     }
 
-    /* ── LEFT COLUMN ── */
+    /* ── VIDEO COLUMN ── */
     .video-col {
-      flex: 0 0 60%;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 0;
+      min-width: 0;
     }
-
     .canvas-wrap {
-      background: var(--card);
+      background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
       position: relative;
+      box-shadow: 0 2px 12px var(--shadow);
     }
     #video-canvas {
       display: block;
       width: 100%;
       aspect-ratio: 4/3;
-      background: #05050a;
+      background: var(--panel-alt);
     }
+    #video-actions { display: none; }
 
-    .video-actions { display: flex; gap: 12px; }
-
-    /* ── RIGHT COLUMN ── */
+    /* ── STATS COLUMN ── */
     .stats-col {
-      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 12px;
+      min-width: 0;
     }
 
+    /* Generic card */
     .card {
-      background: var(--card);
+      background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 20px;
+      box-shadow: 0 2px 8px var(--shadow);
     }
     .card-title {
-      font-size: 0.75rem;
+      font-size: 10px;
+      font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text-dim);
       margin-bottom: 16px;
     }
 
-    /* ── RISK CIRCLE ── */
+    /* ── RISK DONUT ── */
     .risk-card { align-items: center; display: flex; flex-direction: column; }
-    .risk-circle-wrap {
+    .risk-donut-wrap {
       position: relative;
       width: 150px; height: 150px;
-      margin: 0 auto 12px;
+      margin: 0 auto 14px;
     }
-    .risk-circle-wrap svg { transform: rotate(-90deg); }
-    #risk-track { fill: none; stroke: var(--border); stroke-width: 10; }
-    #risk-fill  {
+    .risk-donut-wrap svg { transform: rotate(-90deg); display: block; }
+    #risk-track {
       fill: none;
-      stroke: var(--low);
+      stroke: var(--border);
+      stroke-width: 10;
+    }
+    #risk-fill {
+      fill: none;
+      stroke: var(--risk-low);
       stroke-width: 10;
       stroke-linecap: round;
-      stroke-dasharray: 408;
-      stroke-dashoffset: 408;
-      transition: stroke-dashoffset 0.4s ease, stroke 0.4s ease;
+      stroke-dasharray: 408.4;
+      stroke-dashoffset: 408.4;
+      transition: stroke-dashoffset 0.4s cubic-bezier(.4,0,.2,1), stroke 0.4s ease;
     }
     .risk-center {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
+      pointer-events: none;
     }
     #risk-score-val {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--low);
-      transition: color 0.4s;
-      line-height: 1;
-    }
-    #risk-score-pct { font-size: 0.7rem; color: var(--text-dim); }
-
-    #risk-label {
-      font-size: 1.1rem;
+      font-size: 2.1rem;
       font-weight: 700;
-      color: var(--low);
-      transition: color 0.4s;
-      letter-spacing: 0.05em;
+      color: var(--risk-low);
+      transition: color 0.4s ease;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    #risk-score-pct { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    #risk-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--risk-low);
+      transition: color 0.4s ease;
     }
 
     /* ── METRICS ── */
-    .metrics-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    .metrics-list { display: flex; flex-direction: column; }
     .metric-row {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 8px 0;
+      gap: 10px;
+      padding: 10px 0;
       border-bottom: 1px solid var(--border);
     }
     .metric-row:last-child { border-bottom: none; }
-    .metric-name { font-size: 0.85rem; color: var(--text-dim); }
-    .metric-val  { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+    .metric-icon {
+      width: 32px; height: 32px;
+      background: var(--panel-alt);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .metric-info { flex: 1; min-width: 0; }
+    .metric-name { font-size: 11px; color: var(--text-dim); }
+    .metric-val  { font-size: 15px; font-weight: 600; color: var(--text); }
 
     /* ── STATUS BAR ── */
     #status-bar {
-      background: var(--card);
+      background: var(--panel);
       border-top: 1px solid var(--border);
-      padding: 8px 24px;
-      font-size: 0.8rem;
+      padding: 7px 24px;
+      font-size: 12px;
       color: var(--text-dim);
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
     }
     .status-dot {
-      width: 8px; height: 8px;
+      width: 7px; height: 7px;
       border-radius: 50%;
-      background: var(--text-dim);
+      background: var(--border);
+      flex-shrink: 0;
+      transition: background 0.3s;
     }
-    .status-dot.active { background: var(--low); animation: pulse 1.5s infinite; }
+    .status-dot.active { background: var(--risk-low); animation: pulse 1.5s infinite; }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
+      50%       { opacity: 0.3; }
     }
 
-    /* ── WARNING BANNER ── */
-    #model-warning {
-      display: none;
-      background: rgba(255,214,0,0.1);
-      border: 1px solid var(--medium);
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-size: 0.82rem;
-      color: var(--medium);
-      margin: 0 24px 0;
-    }
-
-    /* ── CONDITIONS ── */
-    .conditions-row { display: flex; gap: 6px; flex-wrap: wrap; }
-    .cond-btn {
-      padding: 6px 12px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text);
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: all 0.15s;
-    }
-    .cond-btn:hover { border-color: var(--accent); }
-    .cond-btn.active {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-
-    /* ── TRIP REPORT ── */
+    /* ── TRIP REPORT OVERLAY ── */
     .trip-report {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.85);
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 200;
+      padding: 16px;
     }
     .trip-report.hidden { display: none; }
     .report-card {
-      background: var(--card);
+      background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 28px;
-      max-width: 460px;
-      width: 90%;
+      max-width: 480px;
+      width: 100%;
       max-height: 90vh;
       overflow-y: auto;
+      box-shadow: 0 24px 64px var(--shadow);
     }
     .report-header {
-      font-size: 18px; font-weight: 600;
+      font-size: 16px; font-weight: 600;
       margin-bottom: 20px; text-align: center;
       color: var(--text);
     }
-    .report-score-block { text-align: center; margin-bottom: 24px; }
-    .report-score { font-size: 64px; font-weight: 700; color: var(--accent); line-height: 1; }
-    .report-score-label { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
-    .report-verdict { font-size: 16px; font-weight: 600; margin-top: 12px; color: var(--text); }
-    .report-stats { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-    .report-stat-row {
-      display: flex; justify-content: space-between;
-      padding: 8px 0; border-bottom: 1px solid var(--border);
-      font-size: 14px;
+    .report-score-block {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 18px;
+      background: var(--panel-alt);
+      border-radius: 10px;
     }
+    .report-score { font-size: 60px; font-weight: 700; color: var(--accent); line-height: 1; letter-spacing: -0.02em; }
+    .report-score-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+    .report-verdict { font-size: 14px; font-weight: 600; margin-top: 10px; color: var(--text); }
+    .report-stats { display: flex; flex-direction: column; margin-bottom: 18px; }
+    .report-stat-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .report-stat-row:last-child { border-bottom: none; }
     .report-stat-row .label { color: var(--text-dim); }
-    .report-stat-row .value { color: var(--text); font-weight: 600; }
-    .report-reco-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .report-stat-row .value { color: var(--text); font-weight: 500; }
+    .report-reco-title {
+      font-size: 10px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
     .report-reco-list { list-style: none; padding: 0; margin: 0 0 20px 0; }
     .report-reco-list li {
-      padding: 8px 12px; margin-bottom: 6px;
-      background: var(--bg);
+      padding: 9px 12px; margin-bottom: 6px;
+      background: var(--panel-alt);
       border-left: 3px solid var(--accent);
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 13px; color: var(--text);
-      line-height: 1.4;
+      line-height: 1.45;
     }
     .report-close-btn {
-      width: 100%; padding: 12px;
-      background: var(--accent); color: #000;
+      width: 100%; padding: 11px;
+      background: var(--accent); color: #fff;
       border: none; border-radius: 8px;
-      font-size: 14px; font-weight: 600; cursor: pointer;
+      font-size: 14px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      transition: background 0.15s;
     }
-    .report-close-btn:hover { opacity: 0.85; }
+    .report-close-btn:hover { background: var(--accent-hover); }
 
     /* ── RESPONSIVE ── */
-    @media (max-width: 768px) {
-      .main-content { flex-direction: column; padding: 0 12px 16px; }
-      .video-col    { flex: none; width: 100%; }
-      .controls-panel { margin: 12px; flex-direction: column; }
-      #model-warning { margin: 0 12px; }
+    @media (max-width: 900px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+        padding: 12px 16px 20px;
+        gap: 12px;
+      }
+      .controls-bar { padding: 10px 16px; }
+      .app-header   { padding: 0 16px; }
+      #model-warning { margin: 10px 16px 0; }
+      #status-bar   { padding: 7px 16px; }
+      #btn-start, #btn-stop { min-height: 44px; padding: 10px 18px; }
+      .src-btn { min-height: 40px; }
+    }
+    @media (max-width: 520px) {
+      .controls-bar { flex-direction: column; align-items: stretch; }
+      .source-btns  { flex-wrap: wrap; }
+      .action-btns  { flex-direction: column; }
+      .ctrl-group   { width: 100%; }
+      #model-select { min-width: unset; width: 100%; }
     }
   </style>
 </head>
 <body>
 
-<!-- ALERT PANEL -->
+<!-- ALERT PANEL (fixed top, level-high / level-critical via JS) -->
 <div id="alert-panel"></div>
 
 <!-- HEADER -->
-<header>
-  <span class="logo-icon">🚗</span>
-  <div>
-    <h1>DriveGuard AI</h1>
-    <p>Система анализа стиля вождения и предсказания рисков ДТП</p>
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon">
+      <!-- shield icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">DriveGuard AI</div>
+      <div class="brand-sub">Анализ стиля вождения и предсказания рисков ДТП</div>
+    </div>
   </div>
+  <button class="theme-btn" id="theme-toggle">
+    <!-- sun icon — shown when dark theme (click → switch to light) -->
+    <svg class="ti-sun" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+    </svg>
+    <!-- moon icon — shown when light theme (click → switch to dark) -->
+    <svg class="ti-moon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+    </svg>
+    <span id="theme-label">Светлая</span>
+  </button>
 </header>
 
 <!-- MODEL WARNING -->
 <div id="model-warning">
-  ⚠ Обученные модели не найдены. Сначала обучите модели: <code>python main.py --synthetic</code>
+  Обученные модели не найдены. Сначала обучите модели: <code>python main.py --synthetic</code>
 </div>
 
-<!-- CONTROLS -->
-<div class="controls-panel">
+<!-- CONTROLS BAR -->
+<div class="controls-bar">
+
+  <!-- ML Model -->
   <div class="ctrl-group">
-    <label>Модель ML</label>
+    <span class="ctrl-label">Модель ML</span>
     <select id="model-select">
       <option value="">— Загрузка... —</option>
     </select>
   </div>
 
+  <!-- Video source — JS toggles .active on btn-camera / btn-video -->
   <div class="ctrl-group">
-    <label>Источник видео</label>
+    <span class="ctrl-label">Источник видео</span>
     <div class="source-btns">
-      <button class="btn btn-outline" id="btn-camera" onclick="selectSource('camera')">📷 USB Камера</button>
-      <button class="btn btn-outline" id="btn-video"  onclick="selectSource('video')">📁 Загрузить видео</button>
+      <button class="src-btn" id="btn-camera" onclick="selectSource('camera')">
+        <!-- camera icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+          <circle cx="12" cy="13" r="3"/>
+        </svg>
+        USB Камера
+      </button>
+      <button class="src-btn" id="btn-video" onclick="selectSource('video')">
+        <!-- upload icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Загрузить видео
+      </button>
     </div>
   </div>
 
-  <div class="ctrl-group">
-    <label>Условия</label>
-    <div class="conditions-row">
-      <button class="cond-btn active" data-cond="dry">Сухо</button>
-      <button class="cond-btn" data-cond="rain">Дождь</button>
-      <button class="cond-btn" data-cond="snow">Снег</button>
-      <button class="cond-btn" data-cond="night">Ночь</button>
-    </div>
-  </div>
-
-  <div class="ctrl-group" id="drop-zone-wrap" style="display:none">
-    <label>Видеофайл</label>
-    <div id="drop-zone" onclick="document.getElementById('file-input').click()"
+  <!-- Video file drop zone (shown when video source selected) -->
+  <div class="ctrl-group" id="drop-zone-wrap">
+    <span class="ctrl-label">Видеофайл</span>
+    <div id="drop-zone"
+         onclick="document.getElementById('file-input').click()"
          ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-      <p>Перетащите файл или нажмите для выбора</p>
-      <p style="font-size:0.75rem;margin-top:4px">MP4, AVI, MOV, MKV</p>
+      Перетащите файл или нажмите для выбора
       <div class="file-info" id="file-info"></div>
     </div>
     <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv" onchange="onFileChange(event)" />
   </div>
 
+  <!-- Road conditions — JS manages .active class on .cond-btn -->
   <div class="ctrl-group">
-    <button class="btn btn-primary" id="btn-start" onclick="startAnalysis()" disabled>▶ Начать анализ</button>
-    <button class="btn btn-danger"  id="btn-stop"  onclick="stopAnalysis()" style="display:none">⏹ Остановить</button>
+    <span class="ctrl-label">Условия</span>
+    <div class="cond-row">
+      <button class="cond-btn active" data-cond="dry">
+        <!-- sun -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+        Сухо
+      </button>
+      <button class="cond-btn" data-cond="rain">
+        <!-- cloud-rain -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
+          <path d="M16 14v6M8 14v6M12 16v6"/>
+        </svg>
+        Дождь
+      </button>
+      <button class="cond-btn" data-cond="snow">
+        <!-- snowflake -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="2" y1="12" x2="22" y2="12"/>
+          <line x1="12" y1="2" x2="12" y2="22"/>
+          <path d="m20 16-4-4 4-4M4 8l4 4-4 4M16 4l-4 4-4-4M8 20l4-4 4 4"/>
+        </svg>
+        Снег
+      </button>
+      <button class="cond-btn" data-cond="night">
+        <!-- moon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+        </svg>
+        Ночь
+      </button>
+    </div>
   </div>
-</div>
+
+  <!-- Start / Stop -->
+  <div class="ctrl-group">
+    <span class="ctrl-label">&nbsp;</span>
+    <div class="action-btns">
+      <button id="btn-start" onclick="startAnalysis()" disabled>
+        <!-- play -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Начать анализ
+      </button>
+      <button id="btn-stop" onclick="stopAnalysis()">
+        <!-- square stop -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <rect width="14" height="14" x="5" y="5" rx="2"/>
+        </svg>
+        Остановить
+      </button>
+    </div>
+  </div>
+
+</div><!-- /controls-bar -->
 
 <!-- MAIN CONTENT -->
-<div class="main-content">
+<div class="main-layout">
 
-  <!-- LEFT: VIDEO -->
+  <!-- LEFT: VIDEO CANVAS -->
   <div class="video-col">
     <div class="canvas-wrap">
       <canvas id="video-canvas" width="640" height="480"></canvas>
     </div>
-    <div class="video-actions" id="video-actions" style="display:none">
-      <!-- пусто, кнопка стоп уже в controls -->
-    </div>
+    <div id="video-actions" style="display:none"></div>
   </div>
 
-  <!-- RIGHT: STATS -->
+  <!-- RIGHT: RISK + METRICS -->
   <div class="stats-col">
 
     <!-- Risk level card -->
     <div class="card risk-card">
       <div class="card-title">Уровень риска</div>
-      <div class="risk-circle-wrap">
+      <div class="risk-donut-wrap">
         <svg width="150" height="150" viewBox="0 0 150 150">
-          <circle id="risk-track" cx="75" cy="75" r="65" />
-          <circle id="risk-fill"  cx="75" cy="75" r="65" />
+          <circle id="risk-track" cx="75" cy="75" r="65"/>
+          <circle id="risk-fill"  cx="75" cy="75" r="65"/>
         </svg>
         <div class="risk-center">
           <div id="risk-score-val">—</div>
@@ -492,17 +712,85 @@
     <!-- Metrics card -->
     <div class="card">
       <div class="card-title">Показатели</div>
-      <div class="metrics-grid">
-        <div class="metric-row"><span class="metric-name">Скорость</span>       <span class="metric-val" id="m-speed">—</span></div>
-        <div class="metric-row"><span class="metric-name">Резких торможений</span><span class="metric-val" id="m-brakes">—</span></div>
-        <div class="metric-row"><span class="metric-name">Резких разгонов</span> <span class="metric-val" id="m-accels">—</span></div>
-        <div class="metric-row"><span class="metric-name">Дистанция</span>       <span class="metric-val" id="m-dist">—</span></div>
-        <div class="metric-row"><span class="metric-name">Смен полосы</span>     <span class="metric-val" id="m-lanes">—</span></div>
+      <div class="metrics-list">
+
+        <div class="metric-row">
+          <div class="metric-icon">
+            <!-- gauge / speedometer -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 14 4-4"/>
+              <path d="M3.34 19a10 10 0 1 1 17.32 0"/>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <div class="metric-name">Скорость</div>
+            <div class="metric-val" id="m-speed">—</div>
+          </div>
+        </div>
+
+        <div class="metric-row">
+          <div class="metric-icon">
+            <!-- triangle-alert -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <div class="metric-name">Резких торможений</div>
+            <div class="metric-val" id="m-brakes">—</div>
+          </div>
+        </div>
+
+        <div class="metric-row">
+          <div class="metric-icon">
+            <!-- zap -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <div class="metric-name">Резких разгонов</div>
+            <div class="metric-val" id="m-accels">—</div>
+          </div>
+        </div>
+
+        <div class="metric-row">
+          <div class="metric-icon">
+            <!-- ruler -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.3 8.7 8.7 21.3c-1 1-2.5 1-3.4 0l-2.6-2.6c-1-1-1-2.5 0-3.4L15.3 2.7c1-1 2.5-1 3.4 0l2.6 2.6c1 1 1 2.5 0 3.4Z"/>
+              <path d="m7.5 10.5 2 2M10.5 7.5l2 2M13.5 4.5l2 2M4.5 13.5l2 2"/>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <div class="metric-name">Дистанция</div>
+            <div class="metric-val" id="m-dist">—</div>
+          </div>
+        </div>
+
+        <div class="metric-row">
+          <div class="metric-icon">
+            <!-- arrow-left-right -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 3 4 7l4 4"/>
+              <path d="M4 7h16"/>
+              <path d="m16 21 4-4-4-4"/>
+              <path d="M20 17H4"/>
+            </svg>
+          </div>
+          <div class="metric-info">
+            <div class="metric-name">Смен полосы</div>
+            <div class="metric-val" id="m-lanes">—</div>
+          </div>
+        </div>
+
       </div>
     </div>
 
   </div>
-</div>
+</div><!-- /main-layout -->
 
 <!-- TRIP REPORT OVERLAY -->
 <div id="trip-report" class="trip-report hidden">
@@ -527,24 +815,52 @@
 </div>
 
 <script>
-// ─────────────────── Константы ───────────────────
-const RISK_COLORS = { LOW:'#00c853', MEDIUM:'#ffd600', HIGH:'#ff6d00', CRITICAL:'#d50000' };
-const RISK_LABELS = { LOW:'НИЗКИЙ', MEDIUM:'СРЕДНИЙ', HIGH:'ВЫСОКИЙ', CRITICAL:'КРИТИЧЕСКИЙ' };
-const ALERT_MESSAGES = {
-  HIGH:     '⚠️ Высокий риск ДТП! Соблюдайте дистанцию и снизьте скорость',
-  CRITICAL: '🚨 КРИТИЧЕСКАЯ УГРОЗА! Немедленно снизьте скорость!'
+// ── CONSTANTS ──────────────────────────────────────────────────────────
+// CSS variable strings — SVG stroke and element color support var() in modern browsers
+const RISK_COLORS = {
+  LOW:      'var(--risk-low)',
+  MEDIUM:   'var(--risk-medium)',
+  HIGH:     'var(--risk-high)',
+  CRITICAL: 'var(--risk-critical)',
 };
-const CIRCUMFERENCE = 2 * Math.PI * 65; // ≈ 408.4
+const RISK_LABELS = {
+  LOW: 'НИЗКИЙ', MEDIUM: 'СРЕДНИЙ', HIGH: 'ВЫСОКИЙ', CRITICAL: 'КРИТИЧЕСКИЙ',
+};
+const ALERT_MESSAGES = {
+  HIGH:     'Высокий риск ДТП! Соблюдайте дистанцию и снизьте скорость',
+  CRITICAL: 'КРИТИЧЕСКАЯ УГРОЗА! Немедленно снизьте скорость!',
+};
+const CIRCUMFERENCE = 2 * Math.PI * 65; // ≈ 408.4  (r=65 matches SVG)
 
-// ─────────────────── Состояние ───────────────────
-let ws            = null;
-let sessionId     = null;
-let selectedSource = null;   // 'camera' | 'video'
+// ── STATE ──────────────────────────────────────────────────────────────
+let ws              = null;
+let sessionId       = null;
+let selectedSource  = null;   // 'camera' | 'video'
 let uploadedVideoId = null;
-let alertTimeout  = null;
+let alertTimeout    = null;
 let activeConditions = ['dry'];
 
-// ─────────────────── Инициализация ───────────────────
+// ── THEME ──────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const lbl = document.getElementById('theme-label');
+  if (lbl) lbl.textContent = theme === 'dark' ? 'Светлая' : 'Тёмная';
+  try { localStorage.setItem('driveguard-theme', theme); } catch {}
+}
+
+// Restore saved theme immediately (script is at end of body, DOM is ready)
+(function () {
+  let saved = 'dark';
+  try { saved = localStorage.getItem('driveguard-theme') || 'dark'; } catch {}
+  applyTheme(saved);
+})();
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+
+// ── INIT ───────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   drawPlaceholder();
   loadModels();
@@ -572,7 +888,7 @@ async function loadModels() {
   }
 }
 
-// ─────────────────── Выбор источника ───────────────────
+// ── SOURCE SELECTION ───────────────────────────────────────────────────
 function selectSource(src) {
   selectedSource = src;
   document.getElementById('btn-camera').classList.toggle('active', src === 'camera');
@@ -589,7 +905,7 @@ function checkStartReady() {
   document.getElementById('btn-start').disabled = !ready;
 }
 
-// ─────────────────── Drag & Drop ───────────────────
+// ── DRAG & DROP ────────────────────────────────────────────────────────
 function onDragOver(e)  { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
 function onDragLeave(e) { document.getElementById('drop-zone').classList.remove('drag-over'); }
 function onDrop(e) {
@@ -601,30 +917,29 @@ function onDrop(e) {
 function onFileChange(e) { const f = e.target.files[0]; if (f) uploadFile(f); }
 
 async function uploadFile(file) {
-  document.getElementById('file-info').textContent = `Загрузка: ${file.name}...`;
+  document.getElementById('file-info').textContent = 'Загрузка: ' + file.name + '...';
   const form = new FormData();
   form.append('file', file);
   try {
-    const res  = await fetch('/api/upload-video', { method:'POST', body: form });
+    const res  = await fetch('/api/upload-video', { method: 'POST', body: form });
     const data = await res.json();
     uploadedVideoId = data.video_id;
-    document.getElementById('file-info').textContent = `✓ ${file.name}`;
+    document.getElementById('file-info').textContent = file.name;
     setStatus('Файл загружен, готов к запуску');
     checkStartReady();
   } catch (e) {
-    document.getElementById('file-info').textContent = '✗ Ошибка загрузки';
+    document.getElementById('file-info').textContent = 'Ошибка загрузки';
   }
 }
 
-// ─────────────────── WebSocket ───────────────────
+// ── WEBSOCKET ──────────────────────────────────────────────────────────
 function startAnalysis() {
   sessionId = crypto.randomUUID();
-  const wsUrl = `ws://${location.host}/ws/${sessionId}`;
-  ws = new WebSocket(wsUrl);
+  ws = new WebSocket(`ws://${location.host}/ws/${sessionId}`);
 
   ws.onopen = () => {
     const model = document.getElementById('model-select').value;
-    const cmd   = { action:'start', source: selectedSource, model, conditions: activeConditions };
+    const cmd   = { action: 'start', source: selectedSource, model, conditions: activeConditions };
     if (selectedSource === 'video') cmd.video_id = uploadedVideoId;
     ws.send(JSON.stringify(cmd));
 
@@ -647,27 +962,24 @@ function startAnalysis() {
   };
 
   ws.onerror = () => setStatus('Ошибка WebSocket соединения');
-  ws.onclose = () => {
-    document.getElementById('status-dot').classList.remove('active');
-  };
+  ws.onclose = () => document.getElementById('status-dot').classList.remove('active');
 }
 
 function stopAnalysis() {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ action:'stop' }));
+    ws.send(JSON.stringify({ action: 'stop' }));
   }
-  // Не вызываем resetUI() сразу — ждём отчёт и "stopped" от сервера
+  // Don't call resetUI() immediately — wait for report + stopped from server
   document.getElementById('btn-stop').style.display  = 'none';
   document.getElementById('btn-start').style.display = 'inline-flex';
   setStatus('Остановка...');
 }
 
-// ─────────────────── Обработка кадра ───────────────────
+// ── FRAME HANDLER ──────────────────────────────────────────────────────
 const canvas = document.getElementById('video-canvas');
 const ctx    = canvas.getContext('2d');
 
 function handleFrame(data) {
-  // Рисуем изображение
   const img = new Image();
   img.onload = () => {
     canvas.width  = img.width  || 640;
@@ -686,9 +998,9 @@ function handleFrame(data) {
   }
 }
 
-// ─────────────────── Риск-дисплей ───────────────────
+// ── RISK DISPLAY ───────────────────────────────────────────────────────
 function updateRiskDisplay(score, level) {
-  const color  = RISK_COLORS[level] || '#888';
+  const color  = RISK_COLORS[level] || 'var(--text-dim)';
   const label  = RISK_LABELS[level] || level;
   const offset = CIRCUMFERENCE * (1 - Math.min(Math.max(score, 0), 1));
 
@@ -702,15 +1014,15 @@ function updateRiskDisplay(score, level) {
 
 function updateMetrics(data) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  set('m-speed',  typeof data.speed_kmh === 'number' ? data.speed_kmh.toFixed(1) + ' км/ч' : '—');
-  set('m-brakes', typeof data.harsh_brakes === 'number' ? data.harsh_brakes : '—');
-  set('m-accels', typeof data.harsh_accels === 'number' ? data.harsh_accels : '—');
+  set('m-speed',  typeof data.speed_kmh === 'number'            ? data.speed_kmh.toFixed(1) + ' км/ч' : '—');
+  set('m-brakes', typeof data.harsh_brakes === 'number'         ? data.harsh_brakes : '—');
+  set('m-accels', typeof data.harsh_accels === 'number'         ? data.harsh_accels : '—');
   set('m-dist',   (typeof data.following_distance === 'number' && data.following_distance >= 0)
                     ? data.following_distance.toFixed(1) + ' м' : '—');
-  set('m-lanes',  typeof data.lane_changes === 'number' ? data.lane_changes : '—');
+  set('m-lanes',  typeof data.lane_changes === 'number'         ? data.lane_changes : '—');
 }
 
-// ─────────────────── Оповещения ───────────────────
+// ── ALERTS ─────────────────────────────────────────────────────────────
 let lastAlertLevel = null;
 
 function showAlert(level, message) {
@@ -728,9 +1040,7 @@ function showAlert(level, message) {
   lastAlertLevel = level;
 
   clearTimeout(alertTimeout);
-  if (level === 'HIGH') {
-    alertTimeout = setTimeout(hideAlert, 4000);
-  }
+  if (level === 'HIGH') alertTimeout = setTimeout(hideAlert, 4000);
 }
 
 function hideAlert() {
@@ -742,36 +1052,42 @@ function hideAlert() {
 
 function showErrorBanner(msg) {
   const panel = document.getElementById('alert-panel');
-  panel.textContent = '❌ ' + msg;
-  panel.className   = 'visible';
-  panel.style.background = '#333';
+  panel.textContent      = msg;
+  panel.className        = 'visible';
+  panel.style.background = 'var(--panel-alt)';
+  panel.style.color      = 'var(--text)';
   clearTimeout(alertTimeout);
-  alertTimeout = setTimeout(() => { panel.className = ''; panel.style.background = ''; }, 5000);
+  alertTimeout = setTimeout(() => {
+    panel.className = '';
+    panel.style.background = '';
+    panel.style.color      = '';
+  }, 5000);
 }
 
 function playAlert(isCritical) {
   try {
-    const actx      = new (window.AudioContext || window.webkitAudioContext)();
-    const osc       = actx.createOscillator();
-    const gainNode  = actx.createGain();
-    osc.connect(gainNode);
-    gainNode.connect(actx.destination);
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.connect(gain);
+    gain.connect(actx.destination);
     osc.frequency.value = isCritical ? 880 : 440;
     osc.type            = 'square';
     const dur = isCritical ? 0.5 : 0.2;
-    gainNode.gain.setValueAtTime(0.3, actx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+    gain.gain.setValueAtTime(0.3, actx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
     osc.start();
     osc.stop(actx.currentTime + dur);
   } catch {}
 }
 
-// ─────────────────── Статус ───────────────────
+// ── STATUS ─────────────────────────────────────────────────────────────
 function setStatus(msg) {
-  document.getElementById('status-text').textContent = msg;
+  const el = document.getElementById('status-text');
+  if (el) el.textContent = msg;
 }
 
-// ─────────────────── Сброс UI ───────────────────
+// ── RESET UI ───────────────────────────────────────────────────────────
 function resetUI() {
   document.getElementById('btn-start').style.display = 'inline-flex';
   document.getElementById('btn-stop').style.display  = 'none';
@@ -782,7 +1098,7 @@ function resetUI() {
   drawPlaceholder();
 }
 
-// ─────────────────── Итоговый отчёт ───────────────────
+// ── TRIP REPORT ────────────────────────────────────────────────────────
 function showTripReport(data) {
   const panel = document.getElementById('trip-report');
   if (!data.available) return;
@@ -820,7 +1136,7 @@ document.getElementById('report-close').addEventListener('click', () => {
   document.getElementById('trip-report').classList.add('hidden');
 });
 
-// ─────────────────── Контекстные условия ───────────────────
+// ── CONDITIONS ─────────────────────────────────────────────────────────
 document.querySelectorAll('.cond-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const cond = btn.dataset.cond;
@@ -842,41 +1158,50 @@ document.querySelectorAll('.cond-btn').forEach(btn => {
   });
 });
 
-// ─────────────────── Canvas placeholder ───────────────────
+// ── CANVAS PLACEHOLDER ─────────────────────────────────────────────────
 function drawPlaceholder() {
   canvas.width  = 640;
   canvas.height = 480;
-  ctx.fillStyle = '#05050a';
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const bgFill   = isDark ? '#16181F' : '#F0F1F4';
+  const bodyFill = isDark ? '#2A2E3A' : '#D1D5DB';
+  const lensFill = isDark ? '#0E0F13' : '#F4F5F7';
+  const ringCol  = isDark ? '#3A3E4E' : '#C4C8D2';
+  const txtCol   = isDark ? '#3A3E4E' : '#9CA3AF';
+  const txt2Col  = isDark ? '#272B38' : '#B5BAC5';
+
+  ctx.fillStyle = bgFill;
   ctx.fillRect(0, 0, 640, 480);
 
-  // Иконка камеры
-  ctx.strokeStyle = '#1e1e2e';
-  ctx.lineWidth   = 3;
-  ctx.fillStyle   = '#1e1e2e';
-  const cx = 320, cy = 220, w = 100, h = 68, r = 10;
-  // корпус камеры
+  // Camera body
+  const cx = 320, cy = 220;
+  ctx.fillStyle = bodyFill;
   ctx.beginPath();
-  ctx.roundRect(cx - w/2, cy - h/2, w, h, r);
+  ctx.roundRect(cx - 50, cy - 34, 100, 68, 10);
   ctx.fill();
-  // линза
-  ctx.fillStyle = '#0a0a0f';
+
+  // Lens
+  ctx.fillStyle = lensFill;
   ctx.beginPath();
   ctx.arc(cx, cy, 20, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#2a2a3a';
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = ringCol;
+  ctx.lineWidth   = 3;
   ctx.stroke();
-  // вспышка
-  ctx.fillStyle = '#1e1e2e';
-  ctx.fillRect(cx + 28, cy - 28, 14, 10);
 
-  ctx.fillStyle   = '#444';
-  ctx.font        = '16px Inter, sans-serif';
-  ctx.textAlign   = 'center';
-  ctx.fillText('Подключите источник видео', cx, cy + 68);
-  ctx.font        = '13px Inter, sans-serif';
-  ctx.fillStyle   = '#333';
-  ctx.fillText('Выберите камеру или загрузите видеофайл', cx, cy + 92);
+  // Flash dot
+  ctx.fillStyle = bodyFill;
+  ctx.fillRect(cx + 30, cy - 26, 12, 8);
+
+  // Labels
+  ctx.fillStyle  = txtCol;
+  ctx.font       = '500 15px Inter, system-ui, sans-serif';
+  ctx.textAlign  = 'center';
+  ctx.fillText('Подключите источник видео', cx, cy + 66);
+  ctx.font       = '400 12px Inter, system-ui, sans-serif';
+  ctx.fillStyle  = txt2Col;
+  ctx.fillText('Выберите камеру или загрузите видеофайл', cx, cy + 88);
 }
 </script>
 </body>
