@@ -329,6 +329,62 @@
       border-color: var(--accent);
     }
 
+    /* ── TRIP REPORT ── */
+    .trip-report {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .trip-report.hidden { display: none; }
+    .report-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      max-width: 460px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .report-header {
+      font-size: 18px; font-weight: 600;
+      margin-bottom: 20px; text-align: center;
+      color: var(--text);
+    }
+    .report-score-block { text-align: center; margin-bottom: 24px; }
+    .report-score { font-size: 64px; font-weight: 700; color: var(--accent); line-height: 1; }
+    .report-score-label { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+    .report-verdict { font-size: 16px; font-weight: 600; margin-top: 12px; color: var(--text); }
+    .report-stats { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+    .report-stat-row {
+      display: flex; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .report-stat-row .label { color: var(--text-dim); }
+    .report-stat-row .value { color: var(--text); font-weight: 600; }
+    .report-reco-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .report-reco-list { list-style: none; padding: 0; margin: 0 0 20px 0; }
+    .report-reco-list li {
+      padding: 8px 12px; margin-bottom: 6px;
+      background: var(--bg);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      font-size: 13px; color: var(--text);
+      line-height: 1.4;
+    }
+    .report-close-btn {
+      width: 100%; padding: 12px;
+      background: var(--accent); color: #000;
+      border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .report-close-btn:hover { opacity: 0.85; }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 768px) {
       .main-content { flex-direction: column; padding: 0 12px 16px; }
@@ -445,6 +501,22 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- TRIP REPORT OVERLAY -->
+<div id="trip-report" class="trip-report hidden">
+  <div class="report-card">
+    <div class="report-header">Отчёт о поездке</div>
+    <div class="report-score-block">
+      <div class="report-score" id="report-score">--</div>
+      <div class="report-score-label">балл безопасности</div>
+      <div class="report-verdict" id="report-verdict">--</div>
+    </div>
+    <div class="report-stats" id="report-stats"></div>
+    <div class="report-reco-title">Рекомендации</div>
+    <ul class="report-reco-list" id="report-reco"></ul>
+    <button class="report-close-btn" id="report-close">Закрыть</button>
   </div>
 </div>
 
@@ -570,6 +642,7 @@ function startAnalysis() {
     if (data.type === 'alert')   showAlert(data.risk_level, data.message);
     if (data.type === 'status')  setStatus(data.message);
     if (data.type === 'error')   { setStatus('Ошибка: ' + data.message); showErrorBanner(data.message); }
+    if (data.type === 'report')  showTripReport(data);
     if (data.type === 'stopped') resetUI();
   };
 
@@ -583,7 +656,10 @@ function stopAnalysis() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ action:'stop' }));
   }
-  resetUI();
+  // Не вызываем resetUI() сразу — ждём отчёт и "stopped" от сервера
+  document.getElementById('btn-stop').style.display  = 'none';
+  document.getElementById('btn-start').style.display = 'inline-flex';
+  setStatus('Остановка...');
 }
 
 // ─────────────────── Обработка кадра ───────────────────
@@ -705,6 +781,44 @@ function resetUI() {
   if (ws) { ws.close(); ws = null; }
   drawPlaceholder();
 }
+
+// ─────────────────── Итоговый отчёт ───────────────────
+function showTripReport(data) {
+  const panel = document.getElementById('trip-report');
+  if (!data.available) return;
+
+  document.getElementById('report-score').textContent   = data.safety_score;
+  document.getElementById('report-verdict').textContent = data.verdict;
+
+  const condMap = { dry: 'Сухо', rain: 'Дождь', snow: 'Снег', night: 'Ночь' };
+  const condStr = (data.conditions && data.conditions.length)
+    ? data.conditions.map(c => condMap[c] || c).join(', ')
+    : 'Сухо';
+
+  const stats = [
+    ['Длительность анализа', data.duration_sec + ' сек'],
+    ['Средняя скорость',      data.avg_speed + ' км/ч'],
+    ['Максимальная скорость', data.max_speed + ' км/ч'],
+    ['Резких торможений',     data.total_brakes],
+    ['Резких разгонов',       data.total_accels],
+    ['Смен полосы',           data.total_lane_changes],
+    ['Время высокого риска',  data.high_risk_pct + ' %'],
+    ['Условия',               condStr],
+  ];
+  document.getElementById('report-stats').innerHTML = stats
+    .map(([label, value]) =>
+      `<div class="report-stat-row"><span class="label">${label}</span><span class="value">${value}</span></div>`)
+    .join('');
+
+  document.getElementById('report-reco').innerHTML = (data.recommendations || [])
+    .map(r => `<li>${r}</li>`).join('');
+
+  panel.classList.remove('hidden');
+}
+
+document.getElementById('report-close').addEventListener('click', () => {
+  document.getElementById('trip-report').classList.add('hidden');
+});
 
 // ─────────────────── Контекстные условия ───────────────────
 document.querySelectorAll('.cond-btn').forEach(btn => {

@@ -186,13 +186,76 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
             elif action == "stop":
                 stop_event.set()
-                await send({"type": "stopped"})
+                # trip report + stopped отправляет _inference_loop после выхода из цикла
 
     except WebSocketDisconnect:
         pass
     finally:
         stop_event.set()
         active_sessions.pop(session_id, None)
+
+
+def _build_trip_report(risk_scores, speeds, high_risk_frames, total_frames,
+                       brakes, accels, lane_changes, conditions, start_time):
+    """Собирает итоговый отчёт о поездке из накопленной статистики."""
+    import numpy as np
+
+    if total_frames == 0 or not risk_scores:
+        return {
+            "type": "report",
+            "available": False,
+            "message": "Недостаточно данных для отчёта (анализ был слишком коротким).",
+        }
+
+    avg_risk = float(np.mean(risk_scores))
+    safety_score = int(round(max(0.0, min(100.0, 100.0 * (1.0 - avg_risk)))))
+
+    if safety_score >= 85:
+        verdict = "Отличный водитель"
+    elif safety_score >= 70:
+        verdict = "Хороший водитель"
+    elif safety_score >= 50:
+        verdict = "Средний уровень"
+    else:
+        verdict = "Опасный стиль вождения"
+
+    avg_speed = float(np.mean(speeds)) if speeds else 0.0
+    max_speed = float(np.max(speeds)) if speeds else 0.0
+    high_risk_pct = round(100.0 * high_risk_frames / total_frames, 1)
+    duration_sec = round(time.time() - start_time, 1)
+
+    recommendations = []
+    if brakes >= 5:
+        recommendations.append("Вы часто резко тормозите. Старайтесь держать большую дистанцию и тормозить плавно.")
+    if accels >= 5:
+        recommendations.append("Замечены частые резкие ускорения. Плавный разгон снижает риск и расход топлива.")
+    if high_risk_pct >= 30:
+        recommendations.append("Значительную часть поездки уровень риска был высоким. Обратите внимание на дистанцию и скорость.")
+    if max_speed > 100:
+        recommendations.append("Зафиксирована высокая скорость. Соблюдение скоростного режима критично для безопасности.")
+    if lane_changes >= 8:
+        recommendations.append("Частые перестроения. Убедитесь, что используете поворотники и проверяете слепые зоны.")
+    if avg_risk < 0.25 and brakes < 3:
+        recommendations.append("Вы вели машину спокойно и безопасно. Так держать.")
+    if not recommendations:
+        recommendations.append("Поездка прошла в штатном режиме без существенных замечаний.")
+
+    return {
+        "type": "report",
+        "available": True,
+        "safety_score": safety_score,
+        "verdict": verdict,
+        "avg_risk": round(avg_risk, 3),
+        "avg_speed": round(avg_speed, 1),
+        "max_speed": round(max_speed, 1),
+        "total_brakes": int(brakes),
+        "total_accels": int(accels),
+        "total_lane_changes": int(lane_changes),
+        "high_risk_pct": high_risk_pct,
+        "duration_sec": duration_sec,
+        "conditions": conditions or [],
+        "recommendations": recommendations,
+    }
 
 
 async def _inference_loop(
@@ -286,12 +349,22 @@ async def _inference_loop(
         if _conditions and context_multiplier > 1.0:
             await send({"type": "status", "message": f"Условия: {', '.join(_conditions)} (×{context_multiplier:.2f})"})
 
+        # --- Trip report accumulators ---
+        report_risk_scores = []      # все risk_score за сессию
+        report_speeds = []           # все speed_kmh где scene активна
+        report_high_risk_frames = 0  # кадры с HIGH/CRITICAL
+        report_total_frames = 0      # всего кадров с extractor.ready
+        report_start_time = time.time()
+
+        harsh_brakes = 0
+        harsh_accels = 0
+        lane_changes = 0
+
         while not stop_event.is_set():
             ret, frame = cap.read()
             if not ret:
                 if source == "video":
                     await send({"type": "status", "message": "Видео завершено"})
-                    await send({"type": "stopped"})
                 else:
                     await send({"type": "error", "message": "Потеря сигнала с камеры"})
                 break
@@ -348,10 +421,7 @@ async def _inference_loop(
             risk_level = RiskLevel.LOW
             result = None
             speed_kmh = 0.0
-            harsh_brakes = 0
-            harsh_accels = 0
             following_distance = -1.0   # -1 = no vehicle detected
-            lane_changes = 0
 
             # Track consecutive frames without vehicle
             if len(detections) == 0:
@@ -445,6 +515,14 @@ async def _inference_loop(
                 else:
                     risk_level = RiskLevel.LOW
 
+                # Накопление статистики для итогового отчёта
+                report_total_frames += 1
+                report_risk_scores.append(risk_score)
+                if is_driving_scene and speed_kmh > 0:
+                    report_speeds.append(speed_kmh)
+                if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+                    report_high_risk_frames += 1
+
                 driving_style_str = "Non-driving" if not is_driving_scene else "Unknown"
                 result = InferenceResult(
                     risk_score=risk_score,
@@ -489,6 +567,15 @@ async def _inference_loop(
                 await send({"type": "alert", "risk_level": level_val, "message": msg})
 
             await asyncio.sleep(0)  # отдаём управление event loop
+
+        # Завершение сессии: отправляем итоговый отчёт, затем stopped
+        report = _build_trip_report(
+            report_risk_scores, report_speeds, report_high_risk_frames,
+            report_total_frames, harsh_brakes, harsh_accels, lane_changes,
+            _conditions, report_start_time,
+        )
+        await send(report)
+        await send({"type": "stopped"})
 
     except Exception as e:
         await send({"type": "error", "message": f"Ошибка анализа: {str(e)}"})
