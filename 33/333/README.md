@@ -1,189 +1,262 @@
-# DriveGuard AI — Driving Style Classification & Risk Prediction
+# DriveGuard — Driving Style Classification & Accident Risk Prediction
 
-Дипломный проект: real-time анализ стиля вождения и риска ДТП с дашкам-видео через ML-модели (XGBoost) + computer vision (YOLOv8, optical flow).
+Real-time analysis of driving style and accident risk from dashcam video,
+combining machine learning models (XGBoost and others) with computer vision
+(YOLOv8 object detection and optical flow).
 
-## Демо
+> Bachelor diploma project — Astana IT University, School of Intelligent
+> Systems, Smart Technology, Group ST-2303.
 
-Локальный веб-интерфейс на localhost:8000. Загружаете видеофайл (или подключаете USB-камеру), система в реальном времени показывает:
-- Скорость, счётчики резких маневров, дистанцию до впереди едущего автомобиля
-- Уровень риска (LOW / MEDIUM / HIGH / CRITICAL)
-- Визуализацию детекции автомобилей (YOLOv8) на видеопотоке
+---
 
-## Структура репозитория
+## Overview
 
-**Важно:** весь код лежит в подпапке `33/333/` от корня репозитория. После клонирования нужно зайти именно туда:
+DriveGuard AI classifies driving behaviour into three styles — **Safe**,
+**Normal** and **Aggressive** — and converts the prediction into an
+interpretable accident-risk score on a four-level scale
+(**LOW / MEDIUM / HIGH / CRITICAL**).
+
+The system has two parts:
+
+- An **offline ML pipeline** that unifies telematic and inertial-sensor data,
+  trains and compares six classifiers, and evaluates them with a
+  leakage-aware, group-based methodology.
+- A **real-time web application** that processes a dashcam video stream (or a
+  USB camera feed), detects surrounding vehicles, estimates motion, and
+  displays live driving metrics and risk alerts.
+
+### Demo
+
+A local web interface runs on `http://localhost:8000`. You upload a video file
+or connect a USB camera, and the system shows in real time:
+
+- Speed, harsh-manoeuvre counters, and the distance to the leading vehicle
+- The current risk level (LOW / MEDIUM / HIGH / CRITICAL)
+- A live YOLOv8 visualisation of detected vehicles on the video stream
+- A trip report with an overall safety score when the session ends
+
+---
+
+## Tech Stack
+
+| Area              | Tools                                          |
+|-------------------|------------------------------------------------|
+| Language          | Python 3.11                                    |
+| Machine learning  | scikit-learn, XGBoost, LightGBM, PyTorch (MLP) |
+| Hyperparameter tuning | Optuna                                         |
+| Interpretability  | SHAP                                           |
+| Computer vision   | OpenCV, Ultralytics (YOLOv8)                   |
+| Web               | FastAPI, uvicorn (wsproto backend), WebSockets |
+
+---
+
+## Repository Structure
+
+> **Important:** all source code lives in the `33/333/` subfolder of the
+> repository root. After cloning, change into that directory — every path and
+> command below is relative to `33/333/`.
+
+```
+33/333/
+├── src/
+│   ├── config.py            # Model hyperparameters, paths, settings
+│   ├── data_loader.py       # Loading Kaggle + UAH datasets
+│   ├── preprocessing.py     # Cleaning, scaling, feature engineering, GroupKFold split
+│   ├── eda.py               # Exploratory data analysis
+│   ├── models.py            # ML models (including the PyTorch MLP)
+│   ├── train.py             # Training pipeline with SMOTE and class weights
+│   ├── evaluate.py          # Metrics, ROC-AUC, confusion matrices
+│   ├── risk_scoring.py      # Converting ML predictions into a 0–1 risk score
+│   ├── camera_inference.py  # Real-time inference: YOLO + optical flow + risk
+│   └── utils.py
+│
+├── web/
+│   └── index.html           # Web interface (HTML + CSS + JS in one file)
+│
+├── models/                  # Trained models (gitignored)
+├── outputs/                 # Figures and reports (gitignored)
+├── data/raw/                # Datasets (gitignored)
+├── temp/                    # Temporary uploaded video files
+│
+├── main.py                  # Main training pipeline
+├── server.py                # FastAPI web server + WebSocket inference
+│
+├── tune_v3.py               # Optuna tuning, feature engineering v3 (best result)
+├── shap_feature_selection.py# SHAP-based feature importance analysis
+├── diagnose_leakage.py      # Data-leakage diagnostics for cross-validation
+│
+└── requirements.txt
+```
+
+---
+
+## Installation
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/aibartrsnbv-source/DrivingStyle_DiplomaProject.git
 cd DrivingStyle_DiplomaProject/33/333
 ```
 
-Дальше в этом README все пути и команды даются относительно `33/333/`.
+### 2. Create a virtual environment
 
-## Стек
-
-- Python 3.10+
-- ML: scikit-learn, XGBoost, LightGBM, PyTorch (MLP)
-- Tuning: Optuna
-- Interpretability: SHAP
-- CV: OpenCV, Ultralytics (YOLOv8)
-- Web: FastAPI, uvicorn (wsproto backend), WebSockets
-
-## Установка
-
-### 1. Клонировать репозиторий
-
-```bash
-git clone https://github.com/aibartrsnbv-source/DrivingStyle_DiplomaProject.git
-cd DrivingStyle_DiplomaProject/33/333
-```
-
-### 2. Виртуальное окружение
-
-Windows:
+**Windows:**
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
 ```
 
-macOS/Linux:
+**macOS / Linux:**
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Зависимости
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 pip install ultralytics wsproto lightgbm shap
 ```
 
-Часть пакетов не в requirements.txt — поставить отдельно. YOLOv8-веса `yolov8n.pt` скачаются автоматически при первом запуске сервера.
+Some packages are not listed in `requirements.txt` and must be installed
+separately. The YOLOv8 weights file `yolov8n.pt` is downloaded automatically
+the first time the server starts.
 
-## Датасеты
+---
 
-В репозитории датасетов нет (большой размер). Нужно скачать вручную.
+## Datasets
 
-### Обязательные:
+Datasets are **not** included in the repository because of their size and must
+be downloaded manually.
 
-**UAH-DriveSet** — реальные сенсорные данные с поездок.
-- Источник: https://robesafe.uah.es/personal/eduardo.romera/uah-driveset/
-- Распаковать в: `data/raw/UAH-DRIVESET/`
+### UAH-DriveSet — real sensor data from driving sessions
 
-**Kaggle Driver Behavior** — данные с смартфонов (acc/gyro + labels).
-- Источник: https://www.kaggle.com/datasets/outofskills/driving-behavior
-- Файл `kaggle_driver_behavior.csv` (или `train_motion_data.csv`/`test_motion_data.csv` после переименования) положить в: `data/raw/`
+- Source: https://robesafe.uah.es/personal/eduardo.romera/uah-driveset/
+- Extract into: `data/raw/UAH-DRIVESET/`
 
-После скачивания структура должна быть:
+### Kaggle Driver Behavior — smartphone data (accelerometer/gyroscope + labels)
+
+- Source: https://www.kaggle.com/datasets/outofskills/driving-behavior
+- Place the file `kaggle_driver_behavior.csv` into: `data/raw/`
+
+After downloading, the structure should look like this:
 
 ```
 data/raw/
 ├── UAH-DRIVESET/
-│   └── (папки с поездками)
+│   └── (trip folders)
 └── kaggle_driver_behavior.csv
 ```
 
-## Обучение моделей
+---
 
-ML-модели не в репозитории (тоже большой размер). Нужно обучить локально.
+## Training the Models
+
+Trained models are not stored in the repository either — they must be trained
+locally:
 
 ```bash
 python main.py
 ```
 
-Это запустит полный pipeline: загрузка → EDA → preprocessing → обучение 6 моделей (Logistic Regression, Random Forest, Gradient Boosting, XGBoost, Voting Ensemble, MLP) → оценка на test → risk scoring. Время: ~3-5 минут.
+This runs the full pipeline: data loading → EDA → preprocessing → training of
+six models (Logistic Regression, Random Forest, Gradient Boosting, XGBoost,
+Voting Ensemble, MLP) → evaluation on the test set → risk scoring. It takes
+about 3–5 minutes.
 
-После обучения в `models/` появятся `.pkl` и `.pt` файлы, в `outputs/figures/` — графики метрик и confusion matrices.
+After training, `.pkl` and `.pt` model files appear in `models/`, and metric
+plots and confusion matrices appear in `outputs/figures/`.
 
-### Лучшая модель
+### Best Model
 
-XGBoost: **F1=0.7265**, Accuracy=0.7023 на test (group-aware split по trip_id).
+**XGBoost** — F1 = 0.7265, Accuracy = 0.7023 on the test set (group-aware
+split by `trip_id`).
 
-Гиперпараметры подобраны через Optuna (Bayesian optimization, 50 trials, GroupKFold) — см. `tune_v3.py` и `models/best_hyperparameters_v3.json`.
+Hyperparameters were tuned with Optuna (Bayesian optimization, 50 trials,
+GroupKFold) — see `tune_v3.py` and `models/best_hyperparameters_v3.json`.
 
-## Запуск веб-интерфейса
+---
+
+## Running the Web Interface
 
 ```bash
 python server.py
 ```
 
-Открыть в браузере: http://localhost:8000
+Then open `http://localhost:8000` in your browser.
 
-### Использование:
-1. В выпадающем списке выбрать модель (обычно последний `xgboost_*.pkl`)
-2. Выбрать источник: **USB Камера** или **Загрузить видео**
-3. Если видео — drag-and-drop файл (.mp4, .avi, .mov, .mkv)
-4. Нажать **Начать анализ**
+### How to use
 
-UI обновляется в реальном времени: видео + метрики + риск-скор + алерты при HIGH/CRITICAL.
+1. Select a model from the dropdown list (usually the latest `xgboost_*.pkl`).
+2. Choose a video source: **USB Camera** or **Upload Video**.
+3. For a video file, drag and drop it (`.mp4`, `.avi`, `.mov`, `.mkv`).
+4. Click **Start Analysis**.
 
-## Структура кода
+The UI updates in real time with the video, the driving metrics, the risk
+score, and alerts when the risk level reaches HIGH or CRITICAL.
 
-```
-33/333/
-├── src/
-│   ├── config.py              # Гиперпараметры моделей, пути, settings
-│   ├── data_loader.py         # Загрузка Kaggle + UAH датасетов
-│   ├── preprocessing.py       # Cleaning, scaling, feature engineering, GroupKFold split
-│   ├── eda.py                 # Exploratory data analysis
-│   ├── models.py              # ML модели (включая PyTorch MLP)
-│   ├── train.py               # Training pipeline с SMOTE и class weights
-│   ├── evaluate.py            # Метрики, ROC-AUC, confusion matrices
-│   ├── risk_scoring.py        # Конвертация ML-предсказаний в risk score 0-1
-│   ├── camera_inference.py    # Real-time inference: YOLO + optical flow + risk
-│   └── utils.py
-│
-├── web/
-│   └── index.html             # Веб-интерфейс
-│
-├── models/                    # Обученные модели (gitignored)
-├── outputs/                   # Графики, отчёты (gitignored)
-├── data/raw/                  # Датасеты (gitignored)
-│
-├── main.py                    # Главный pipeline обучения
-├── server.py                  # FastAPI веб-сервер + WebSocket inference
-│
-├── tune_hyperparameters.py    # Optuna tuning с GroupKFold (honest CV)
-├── tune_v2.py                 # Feature engineering v2 + class weight boost
-├── tune_v3.py                 # Feature engineering v3 + LightGBM (лучший результат)
-├── tune_stacking.py           # Stacking ensemble (не дал прирост)
-├── shap_feature_selection.py  # SHAP-анализ важности признаков
-├── diagnose_leakage.py        # Диагностика data leakage в CV
-│
-└── requirements.txt
-```
+### API Endpoints
 
-## Командная работа
+| Method | URL | Description |
+|--------|-----|-------------|
+| GET  | `/`                   | Main page |
+| GET  | `/api/models`         | List of available models |
+| POST | `/api/upload-video`   | Upload a video file |
+| WS   | `/ws/{session_id}`    | WebSocket for real-time inference |
 
-Каждый разработчик работает в своей ветке от master:
+---
+
+## Team Workflow
+
+Each developer works on their own branch created from `master`:
 
 ```bash
-git checkout -b feature/имя-задачи
-# ... работаешь ...
+git checkout -b feature/your-task
+# ... work ...
 git add .
-git commit -m "Описание"
-git push -u origin feature/имя-задачи
+git commit -m "Description"
+git push -u origin feature/your-task
 ```
 
-В master сливаемся через Pull Request на GitHub после ревью.
+Changes are merged into `master` through a Pull Request on GitHub after review.
+
+---
 
 ## Troubleshooting
 
-**`ultralytics not installed`** при запуске сервера → `pip install ultralytics`
+**`ultralytics not installed` when starting the server**
+Run `pip install ultralytics`.
 
-**WebSocket падает с AssertionError** → сервер запущен без `wsproto`. Проверить что в `server.py` есть `uvicorn.run(..., ws="wsproto")` и что `pip install wsproto` выполнено.
+**WebSocket fails with an `AssertionError`**
+The server was started without `wsproto`. Make sure `server.py` calls
+`uvicorn.run(..., ws="wsproto")` and that `pip install wsproto` has been run.
 
-**Камера не открывается** → закрыть Zoom/Teams/Discord/Skype, которые могут держать камеру.
+**Camera does not open**
+Close other applications that may be holding the camera (Zoom, Teams, Discord,
+Skype).
 
-**Скорость в UI заниженная или завышенная** → калибровочная константа в `src/camera_inference.py`, переменная `FLOW_TO_KMH`. Текущее значение 1.2 откалибровано на реальном дашкам-видео (24fps, 4K).
+**Speed in the UI is too low or too high**
+Adjust the calibration constant `FLOW_TO_KMH` in `src/camera_inference.py`.
+The current value of `1.2` is calibrated on real dashcam video (24 fps, 4K).
 
-**`yolov8n.pt` не скачался** → нужен интернет при первом запуске сервера. Если нет — скачать вручную: https://github.com/ultralytics/assets/releases/
+**`yolov8n.pt` did not download**
+An internet connection is required on the first server start. If you have no
+connection, download the weights manually from
+https://github.com/ultralytics/assets/releases/.
 
-## Авторы
+---
 
-[список команды]
+## Authors
 
-## Лицензия
+- Latip Medet
+- Kadiraly Miras
+- Tursynbayev Aibar
 
-Учебный проект, не для коммерческого использования.
+Supervisor: Sadvakasova Assemgul — Astana IT University, School of Intelligent
+Systems.
+
+## License
+
+Academic project. Not for commercial use.

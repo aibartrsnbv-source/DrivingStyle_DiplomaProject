@@ -91,7 +91,7 @@ MIN_WINDOW = 10
 # Optimization constants
 FLOW_RESIZE = (320, 240)   # compute optical flow on reduced frame
 YOLO_SKIP_FRAMES = 3       # run YOLO every N frames
-FLOW_TO_KMH = 1.2          # recalibrated on real dashcam footage (24fps, 4K).
+FLOW_TO_KMH = 0.45          # recalibrated on real dashcam footage (24fps, 4K).
                             # Previous 0.44 underestimated speed by factor ~2.77.
                             # Verified empirically: UI shows ~23 km/h while real speed is ~65 km/h.
 
@@ -499,9 +499,9 @@ class CameraFeatureExtractor:
         # Пороги уровней — без изменений
         if risk_score >= 0.75:
             level = "CRITICAL"
-        elif risk_score >= 0.55:
+        elif risk_score >= 0.65:
             level = "HIGH"
-        elif risk_score >= 0.30:
+        elif risk_score >= 0.45:
             level = "MEDIUM"
         else:
             level = "LOW"
