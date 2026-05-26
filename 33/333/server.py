@@ -18,7 +18,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
@@ -56,7 +56,23 @@ except ImportError as e:
         HIGH = "HIGH"
         CRITICAL = "CRITICAL"
 
+# Database — optional, graceful degradation if missing
+_DB_AVAILABLE = False
+try:
+    from src.database import (
+        init_db,
+        save_trip,
+        get_trips as db_get_trips,
+        get_trip as db_get_trip,
+    )
+    _DB_AVAILABLE = True
+except Exception as _db_err:
+    print(f"[WARN] database module unavailable: {_db_err}")
+
 app = FastAPI(title="DriveGuard AI", version="1.0.0")
+
+if _DB_AVAILABLE:
+    init_db()
 
 TEMP_DIR = Path("temp")
 TEMP_DIR.mkdir(exist_ok=True)
@@ -105,6 +121,22 @@ async def upload_video(file: UploadFile = File(...)):
         "status": "ready",
         "_path": str(save_path),
     })
+
+
+@app.get("/api/trips")
+async def list_trips():
+    trips = db_get_trips() if _DB_AVAILABLE else []
+    return JSONResponse(trips)
+
+
+@app.get("/api/trips/{trip_id}")
+async def get_single_trip(trip_id: int):
+    if not _DB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    trip = db_get_trip(trip_id)
+    if trip is None:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    return JSONResponse(trip)
 
 
 # ─────────────────────────── WebSocket ─────────────────────────────────
@@ -567,6 +599,14 @@ async def _inference_loop(
             _conditions, report_start_time,
         )
         await send(report)
+
+        if _DB_AVAILABLE and report.get("available"):
+            try:
+                model_name_str = model_path.name if model_path is not None else ""
+                save_trip({**report, "model_name": model_name_str})
+            except Exception:
+                logging.getLogger(__name__).exception("Trip DB save failed — continuing")
+
         await send({"type": "stopped"})
 
     except Exception as e:

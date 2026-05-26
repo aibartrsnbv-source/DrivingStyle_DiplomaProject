@@ -530,6 +530,143 @@
       .ctrl-group   { width: 100%; }
       #model-select { min-width: unset; width: 100%; }
     }
+
+    /* ── NAV TABS ── */
+    .nav-tabs { display: flex; gap: 4px; }
+    .nav-tab {
+      padding: 6px 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .nav-tab:hover { color: var(--text); border-color: var(--border); }
+    .nav-tab.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-subtle);
+    }
+
+    /* ── HISTORY VIEW ── */
+    .history-view {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 24px 24px;
+    }
+    .history-view.hidden { display: none; }
+    .history-container { max-width: 900px; margin: 0 auto; }
+    .history-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .history-title { font-size: 16px; font-weight: 600; color: var(--text); }
+    .btn-refresh {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-refresh:hover { color: var(--text); border-color: var(--text-dim); }
+
+    /* Trip cards */
+    .trip-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px var(--shadow);
+    }
+    .trip-card-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .trip-card-header:hover { background: var(--panel-alt); }
+    .trip-score-block { display: flex; flex-direction: column; align-items: center; min-width: 48px; flex-shrink: 0; }
+    .trip-score-num { font-size: 22px; font-weight: 700; color: var(--accent); line-height: 1; }
+    .trip-score-sub { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+    .risk-badge {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .risk-badge-low      { color: var(--risk-low);      border: 1px solid var(--risk-low); }
+    .risk-badge-medium   { color: var(--risk-medium);   border: 1px solid var(--risk-medium); }
+    .risk-badge-high     { color: var(--risk-high);     border: 1px solid var(--risk-high); }
+    .risk-badge-critical { color: var(--risk-critical); border: 1px solid var(--risk-critical); }
+    .trip-meta { flex: 1; min-width: 0; }
+    .trip-date { font-size: 12px; color: var(--text-dim); margin-bottom: 3px; }
+    .trip-tags { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text); }
+    .trip-expand-icon { margin-left: auto; color: var(--text-dim); flex-shrink: 0; transition: transform 0.2s; }
+    .trip-card.expanded .trip-expand-icon { transform: rotate(180deg); }
+
+    .trip-detail {
+      display: none;
+      padding: 0 18px 16px;
+      border-top: 1px solid var(--border);
+    }
+    .trip-card.expanded .trip-detail { display: block; }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--text-dim); }
+    .detail-value { color: var(--text); font-weight: 500; }
+    .trip-reco { background: var(--panel-alt); border-radius: 8px; padding: 12px; margin-top: 12px; }
+    .trip-reco-title {
+      font-size: 10px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--text-dim); margin-bottom: 8px;
+    }
+    .trip-reco-item {
+      font-size: 13px; color: var(--text);
+      padding: 7px 10px; margin-bottom: 5px;
+      background: var(--panel);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      line-height: 1.45;
+    }
+    .trip-reco-item:last-child { margin-bottom: 0; }
+
+    /* Empty / error states */
+    .trips-empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .trips-error {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--risk-high);
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
@@ -551,6 +688,16 @@
       <div class="brand-sub">Анализ стиля вождения и предсказания рисков ДТП</div>
     </div>
   </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" id="nav-analysis" onclick="showView('analysis')">Анализ</button>
+    <button class="nav-tab" id="nav-history" onclick="showView('history')">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      История
+    </button>
+  </nav>
+
   <button class="theme-btn" id="theme-toggle">
     <!-- sun icon — shown when dark theme (click → switch to light) -->
     <svg class="ti-sun" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -791,6 +938,27 @@
 
   </div>
 </div><!-- /main-layout -->
+
+<!-- HISTORY VIEW -->
+<div id="history-view" class="history-view hidden">
+  <div class="history-container">
+    <div class="history-toolbar">
+      <h2 class="history-title">История поездок</h2>
+      <button class="btn-refresh" onclick="loadHistory()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+          <path d="M16 16h5v5"/>
+        </svg>
+        Обновить
+      </button>
+    </div>
+    <div id="trips-list">
+      <div class="trips-empty">Загрузка...</div>
+    </div>
+  </div>
+</div>
 
 <!-- TRIP REPORT OVERLAY -->
 <div id="trip-report" class="trip-report hidden">
@@ -1157,6 +1325,115 @@ document.querySelectorAll('.cond-btn').forEach(btn => {
     }
   });
 });
+
+// ── CANVAS PLACEHOLDER ─────────────────────────────────────────────────
+// ── VIEW SWITCHING ──────────────────────────────────────────────────────
+function showView(view) {
+  const isAnalysis = view === 'analysis';
+  document.getElementById('nav-analysis').classList.toggle('active', isAnalysis);
+  document.getElementById('nav-history').classList.toggle('active', !isAnalysis);
+  document.querySelector('.controls-bar').style.display = isAnalysis ? '' : 'none';
+  document.querySelector('.main-layout').style.display  = isAnalysis ? '' : 'none';
+  document.getElementById('status-bar').style.display   = isAnalysis ? '' : 'none';
+  document.getElementById('history-view').classList.toggle('hidden', isAnalysis);
+  if (!isAnalysis) loadHistory();
+}
+
+// ── HISTORY ─────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const list = document.getElementById('trips-list');
+  list.innerHTML = '<div class="trips-empty">Загрузка...</div>';
+  try {
+    const res = await fetch('/api/trips');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const trips = await res.json();
+    renderTrips(trips);
+  } catch (e) {
+    list.innerHTML = '<div class="trips-error">Ошибка загрузки данных: ' + e.message + '</div>';
+  }
+}
+
+function _fmtDate(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    return new Date(isoStr).toLocaleString('ru-RU', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit',
+    });
+  } catch { return isoStr; }
+}
+
+function _riskBadge(level) {
+  const cls = { LOW: 'low', MEDIUM: 'medium', HIGH: 'high', CRITICAL: 'critical' }[level] || 'low';
+  const lbl = { LOW: 'НИЗКИЙ', MEDIUM: 'СРЕДНИЙ', HIGH: 'ВЫСОКИЙ', CRITICAL: 'КРИТИЧЕСКИЙ' }[level] || (level || '—');
+  return `<span class="risk-badge risk-badge-${cls}">${lbl}</span>`;
+}
+
+const _COND_MAP = { dry: 'Сухо', rain: 'Дождь', snow: 'Снег', night: 'Ночь' };
+
+function renderTrips(trips) {
+  const list = document.getElementById('trips-list');
+  if (!trips || trips.length === 0) {
+    list.innerHTML = '<div class="trips-empty">Нет записанных поездок.<br>Проведите анализ — результат появится здесь.</div>';
+    return;
+  }
+  list.innerHTML = trips.map(trip => {
+    const weather = trip.weather
+      ? trip.weather.split(', ').map(c => _COND_MAP[c] || c).join(', ')
+      : null;
+    const model   = trip.model_name || null;
+    const recos   = trip.recommendation ? trip.recommendation.split('\n').filter(Boolean) : [];
+
+    const tags = [
+      trip.avg_speed != null ? trip.avg_speed + ' км/ч' : null,
+      weather,
+      model,
+    ].filter(Boolean).join(' · ');
+
+    const detailRows = [
+      ['Длительность',          trip.duration_sec     != null ? trip.duration_sec + ' сек'     : '—'],
+      ['Средняя скорость',      trip.avg_speed        != null ? trip.avg_speed + ' км/ч'        : '—'],
+      ['Максимальная скорость', trip.max_speed        != null ? trip.max_speed + ' км/ч'        : '—'],
+      ['Резких торможений',     trip.harsh_braking    ?? '—'],
+      ['Резких разгонов',       trip.harsh_accel      ?? '—'],
+      ['Смен полосы',           trip.lane_changes     ?? '—'],
+      ['Время высокого риска',  trip.high_risk_time_pct != null ? trip.high_risk_time_pct + ' %' : '—'],
+      ['Условия',               weather || '—'],
+      ['Модель',                model   || '—'],
+    ].map(([lbl, val]) =>
+      `<div class="detail-row"><span class="detail-label">${lbl}</span><span class="detail-value">${val}</span></div>`
+    ).join('');
+
+    const recoHtml = recos.length
+      ? recos.map(r => `<div class="trip-reco-item">${r}</div>`).join('')
+      : '<div class="trip-reco-item">—</div>';
+
+    return `
+      <div class="trip-card" onclick="this.classList.toggle('expanded')">
+        <div class="trip-card-header">
+          <div class="trip-score-block">
+            <div class="trip-score-num">${trip.safety_score ?? '—'}</div>
+            <div class="trip-score-sub">балл</div>
+          </div>
+          ${_riskBadge(trip.risk_level)}
+          <div class="trip-meta">
+            <div class="trip-date">${_fmtDate(trip.created_at)}</div>
+            <div class="trip-tags">${tags || '&nbsp;'}</div>
+          </div>
+          <svg class="trip-expand-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+        <div class="trip-detail">
+          ${detailRows}
+          <div class="trip-reco">
+            <div class="trip-reco-title">Рекомендации</div>
+            ${recoHtml}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
 
 // ── CANVAS PLACEHOLDER ─────────────────────────────────────────────────
 function drawPlaceholder() {

@@ -26,6 +26,10 @@ outputs/
 temp/
 *.log
 
+# Database
+*.db
+driveguard.db
+
 # YOLO weights (скачиваются автоматически)
 yolov8n.pt
 yolov8s.pt
