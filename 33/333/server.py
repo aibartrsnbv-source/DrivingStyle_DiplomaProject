@@ -79,6 +79,18 @@ TEMP_DIR.mkdir(exist_ok=True)
 
 MODELS_DIR = Path("models")
 
+
+def _find_xgboost_model() -> Path | None:
+    """Return the most recently modified xgboost*.pkl in models/, or None."""
+    if not MODELS_DIR.exists():
+        return None
+    candidates = sorted(
+        (f for f in MODELS_DIR.iterdir() if f.name.startswith("xgboost") and f.suffix == ".pkl"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
 WEB_DIR = Path("web")
 
 if WEB_DIR.exists():
@@ -100,12 +112,11 @@ async def root():
     return HTMLResponse(content="<h1>DriveGuard AI</h1><p>web/index.html не найден</p>")
 
 
-@app.get("/api/models")
-async def get_models():
-    if not MODELS_DIR.exists():
-        return JSONResponse({"models": []})
-    models = [f.name for f in MODELS_DIR.iterdir() if f.suffix == ".pkl"]
-    return JSONResponse({"models": models})
+@app.get("/api/model")
+async def get_active_model():
+    """Returns the XGBoost model currently in use (for diagnostics)."""
+    xgb = _find_xgboost_model()
+    return JSONResponse({"model": xgb.name if xgb else None})
 
 
 @app.post("/api/upload-video")
@@ -176,7 +187,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 active_sessions[session_id] = stop_event
 
                 source = cmd.get("source", "camera")
-                model_name = cmd.get("model", "")
                 video_id = cmd.get("video_id")
                 conditions = cmd.get("conditions", [])  # список строк: ["rain", "night"] и т.п.
 
@@ -184,9 +194,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     await send({"type": "error", "message": "Модуль camera_inference недоступен. Убедитесь что он существует в src/"})
                     continue
 
-                model_path = MODELS_DIR / model_name if model_name else None
-                if model_path and not model_path.exists():
-                    await send({"type": "error", "message": f"Модель не найдена: {model_name}"})
+                model_path = _find_xgboost_model()
+                if model_path is None:
+                    await send({"type": "error", "message": "XGBoost модель не найдена — сначала обучите модели: python main.py"})
                     continue
 
                 # Определяем путь к видео

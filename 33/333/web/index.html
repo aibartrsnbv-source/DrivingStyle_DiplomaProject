@@ -133,18 +133,6 @@
     }
     body.critical-active { animation: criticalFlash 0.5s infinite; }
 
-    /* ── MODEL WARNING ── */
-    #model-warning {
-      display: none;
-      background: rgba(251,191,36,0.08);
-      border: 1px solid var(--risk-medium);
-      border-radius: 8px;
-      padding: 8px 16px;
-      font-size: 12px;
-      color: var(--risk-medium);
-      margin: 12px 24px 0;
-    }
-
     /* ── CONTROLS BAR ── */
     .controls-bar {
       background: var(--panel);
@@ -167,22 +155,6 @@
       letter-spacing: 0.07em;
       color: var(--text-dim);
     }
-
-    /* Model select */
-    #model-select {
-      background: var(--panel-alt);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 7px 10px;
-      font-size: 13px;
-      font-family: inherit;
-      min-width: 190px;
-      cursor: pointer;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    #model-select:focus { border-color: var(--accent); }
 
     /* Source buttons — keep class active toggleable by JS */
     .source-btns { display: flex; gap: 6px; }
@@ -518,7 +490,6 @@
       }
       .controls-bar { padding: 10px 16px; }
       .app-header   { padding: 0 16px; }
-      #model-warning { margin: 10px 16px 0; }
       #status-bar   { padding: 7px 16px; }
       #btn-start, #btn-stop { min-height: 44px; padding: 10px 18px; }
       .src-btn { min-height: 40px; }
@@ -528,7 +499,6 @@
       .source-btns  { flex-wrap: wrap; }
       .action-btns  { flex-direction: column; }
       .ctrl-group   { width: 100%; }
-      #model-select { min-width: unset; width: 100%; }
     }
 
     /* ── NAV TABS ── */
@@ -712,21 +682,8 @@
   </button>
 </header>
 
-<!-- MODEL WARNING -->
-<div id="model-warning">
-  Обученные модели не найдены. Сначала обучите модели: <code>python main.py --synthetic</code>
-</div>
-
 <!-- CONTROLS BAR -->
 <div class="controls-bar">
-
-
-  <div class="ctrl-group">
-    <span class="ctrl-label">Модель ML</span>
-    <select id="model-select">
-      <option value="">— Загрузка... —</option>
-    </select>
-  </div>
 
   <!-- Video source — JS toggles .active on btn-camera / btn-video -->
   <div class="ctrl-group">
@@ -1031,30 +988,7 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 // ── INIT ───────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   drawPlaceholder();
-  loadModels();
 });
-
-async function loadModels() {
-  try {
-    const res  = await fetch('/api/models');
-    const data = await res.json();
-    const sel  = document.getElementById('model-select');
-    sel.innerHTML = '';
-    if (!data.models || data.models.length === 0) {
-      document.getElementById('model-warning').style.display = 'block';
-      sel.innerHTML = '<option value="">— Модели не найдены —</option>';
-    } else {
-      data.models.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m; opt.textContent = m;
-        sel.appendChild(opt);
-      });
-    }
-    checkStartReady();
-  } catch (e) {
-    setStatus('Ошибка подключения к серверу');
-  }
-}
 
 // ── SOURCE SELECTION ───────────────────────────────────────────────────
 function selectSource(src) {
@@ -1068,8 +1002,7 @@ function selectSource(src) {
 }
 
 function checkStartReady() {
-  const model = document.getElementById('model-select').value;
-  const ready = model && selectedSource && (selectedSource === 'camera' || uploadedVideoId);
+  const ready = selectedSource && (selectedSource === 'camera' || uploadedVideoId);
   document.getElementById('btn-start').disabled = !ready;
 }
 
@@ -1106,8 +1039,7 @@ function startAnalysis() {
   ws = new WebSocket(`ws://${location.host}/ws/${sessionId}`);
 
   ws.onopen = () => {
-    const model = document.getElementById('model-select').value;
-    const cmd   = { action: 'start', source: selectedSource, model, conditions: activeConditions };
+    const cmd = { action: 'start', source: selectedSource, conditions: activeConditions };
     if (selectedSource === 'video') cmd.video_id = uploadedVideoId;
     ws.send(JSON.stringify(cmd));
 
