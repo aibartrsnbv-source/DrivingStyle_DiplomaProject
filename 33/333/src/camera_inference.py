@@ -496,7 +496,6 @@ class CameraFeatureExtractor:
             0.0, 1.0
         ))
 
-        # Пороги уровней — без изменений
         if risk_score >= 0.75:
             level = "CRITICAL"
         elif risk_score >= 0.65:
@@ -946,8 +945,6 @@ class CameraInference:
             "ON" if use_adapter else "OFF", n_expected,
         )
 
-    # ------------------------------------------------------------------ run
-
     def run(self) -> None:
         """Start the inference loop. Press Q to quit."""
         self._cap = cv2.VideoCapture(self.source)
@@ -1015,8 +1012,6 @@ class CameraInference:
 
         finally:
             self._cleanup()
-
-    # --------------------------------------------------------------- helpers
 
     def _extract_frame_features(
         self, frame: np.ndarray, detections: List[Dict]

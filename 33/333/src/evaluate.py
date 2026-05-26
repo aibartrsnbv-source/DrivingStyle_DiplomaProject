@@ -39,7 +39,6 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import label_binarize
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -114,16 +113,13 @@ class ModelEvaluator:
         print(f"EVALUATING: {model_name}")
         print("=" * 60)
 
-        # Convert to numpy
         if isinstance(X_test, pd.DataFrame):
             X_test = X_test.values
         if isinstance(y_test, pd.Series):
             y_test = y_test.values
 
-        # Get predictions
         y_pred = model.predict(X_test)
 
-        # Get probability predictions if available
         y_proba = None
         if hasattr(model, "predict_proba"):
             try:
@@ -131,14 +127,11 @@ class ModelEvaluator:
             except Exception:
                 pass
 
-        # Determine if multiclass
         n_classes = len(np.unique(y_test))
         is_multiclass = n_classes > 2
 
-        # Set averaging method
         average = "weighted" if is_multiclass else "binary"
 
-        # Calculate metrics
         metrics = {
             "accuracy": accuracy_score(y_test, y_pred),
             "precision": precision_score(y_test, y_pred, average=average, zero_division=0),
@@ -146,7 +139,6 @@ class ModelEvaluator:
             "f1_score": f1_score(y_test, y_pred, average=average, zero_division=0),
         }
 
-        # Calculate ROC-AUC if probabilities available
         if y_proba is not None:
             try:
                 if is_multiclass:
@@ -162,14 +154,12 @@ class ModelEvaluator:
                 print(f"  ⚠ Could not compute ROC-AUC: {e}")
                 metrics["roc_auc"] = None
 
-        # Print metrics
         print(f"\nMetrics:")
         print("-" * 40)
         for metric_name, value in metrics.items():
             if value is not None:
                 print(f"  {metric_name.capitalize():15s}: {value:.4f}")
 
-        # Classification report
         print(f"\nClassification Report:")
         print("-" * 40)
         report = classification_report(
@@ -179,7 +169,6 @@ class ModelEvaluator:
         )
         print(report)
 
-        # Store results
         self.results[model_name] = {
             "metrics": metrics,
             "y_true": y_test,
@@ -218,7 +207,6 @@ class ModelEvaluator:
         y_pred = result["y_pred"]
         class_names = result["class_names"]
 
-        # Compute confusion matrix
         cm = confusion_matrix(y_true, y_pred)
 
         if normalize:
@@ -229,7 +217,6 @@ class ModelEvaluator:
             fmt = "d"
             title = f"Confusion Matrix: {model_name}"
 
-        # Plot
         fig, ax = plt.subplots(figsize=(8, 6))
 
         sns.heatmap(
@@ -274,7 +261,6 @@ class ModelEvaluator:
         """
         model_names = model_names or list(self.results.keys())
 
-        # Filter models with probability predictions
         valid_models = [
             name for name in model_names
             if name in self.results and self.results[name]["y_proba"] is not None
@@ -289,7 +275,6 @@ class ModelEvaluator:
         n_classes = self.results[valid_models[0]]["n_classes"]
 
         if n_classes == 2:
-            # Binary classification
             fig, ax = plt.subplots(figsize=(10, 8))
 
             for model_name in valid_models:
@@ -311,7 +296,6 @@ class ModelEvaluator:
             ax.grid(True, alpha=0.3)
 
         else:
-            # Multiclass - plot one-vs-rest for each class
             fig, axes = plt.subplots(1, n_classes, figsize=(5 * n_classes, 5))
 
             class_names = self.results[valid_models[0]]["class_names"] or \
@@ -394,13 +378,11 @@ class ModelEvaluator:
                         label=f"{model_name} (AP = {ap:.3f})")
 
         else:
-            # Weighted average for multiclass
             for model_name in valid_models:
                 result = self.results[model_name]
                 y_true = result["y_true"]
                 y_proba = result["y_proba"]
 
-                # Compute average precision per class and weight
                 ap_scores = []
                 for cls_idx in range(n_classes):
                     y_true_binary = (y_true == cls_idx).astype(int)
@@ -451,7 +433,6 @@ class ModelEvaluator:
         model_names = model_names or list(self.results.keys())
         metrics = metrics or ["accuracy", "precision", "recall", "f1_score"]
 
-        # Prepare data
         data = []
         for model_name in model_names:
             if model_name in self.results:
@@ -466,7 +447,6 @@ class ModelEvaluator:
 
         df = pd.DataFrame(data)
 
-        # Create grouped bar chart
         fig, ax = plt.subplots(figsize=(12, 6))
 
         x = np.arange(len(model_names))
@@ -482,7 +462,6 @@ class ModelEvaluator:
             offset = (i - len(metrics)/2 + 0.5) * width
             bars = ax.bar(x + offset, values, width, label=metric_name, color=colors[i])
 
-            # Add value labels
             for bar, val in zip(bars, values):
                 ax.text(
                     bar.get_x() + bar.get_width()/2,
@@ -534,7 +513,6 @@ class ModelEvaluator:
 
         epochs = range(1, len(training_history["train_loss"]) + 1)
 
-        # Loss plot
         axes[0].plot(epochs, training_history["train_loss"], "b-", linewidth=2, label="Training Loss")
         if training_history.get("val_loss"):
             axes[0].plot(epochs, training_history["val_loss"], "r-", linewidth=2, label="Validation Loss")
@@ -544,7 +522,6 @@ class ModelEvaluator:
         axes[0].legend()
         axes[0].grid(True, alpha=0.3)
 
-        # Accuracy plot
         if training_history.get("val_acc"):
             axes[1].plot(epochs, training_history["val_acc"], "g-", linewidth=2, label="Validation Accuracy")
             axes[1].set_xlabel("Epoch", fontsize=12)
@@ -586,7 +563,6 @@ class ModelEvaluator:
 
         df = pd.DataFrame(comparison_data)
 
-        # Sort by F1 score
         df = df.sort_values("f1_score", ascending=False)
 
         return df
@@ -615,14 +591,12 @@ class ModelEvaluator:
             "",
         ]
 
-        # Overall comparison
         comparison_df = self.get_comparison_table()
         report_lines.append("OVERALL COMPARISON")
         report_lines.append("-" * 70)
         report_lines.append(comparison_df.to_string(index=False))
         report_lines.append("")
 
-        # Best model
         if len(comparison_df) > 0:
             best_model = comparison_df.iloc[0]["Model"]
             best_f1 = comparison_df.iloc[0]["f1_score"]
@@ -630,7 +604,6 @@ class ModelEvaluator:
             report_lines.append(f"F1-Score: {best_f1:.4f}")
             report_lines.append("")
 
-        # Detailed results for each model
         report_lines.append("DETAILED RESULTS")
         report_lines.append("=" * 70)
 
@@ -642,7 +615,6 @@ class ModelEvaluator:
                 if value is not None:
                     report_lines.append(f"  {metric:15s}: {value:.4f}")
 
-            # Confusion matrix summary
             y_true = result["y_true"]
             y_pred = result["y_pred"]
             cm = confusion_matrix(y_true, y_pred)
@@ -698,29 +670,22 @@ def evaluate_all_models(
     """
     evaluator = ModelEvaluator()
 
-    # Evaluate each model
     for model_name, model in models.items():
         evaluator.evaluate_model(model, X_test, y_test, model_name, class_names)
 
-    # Generate visualizations
     print("\n" + "=" * 60)
     print("GENERATING EVALUATION VISUALIZATIONS")
     print("=" * 60)
 
-    # Comparison chart
     evaluator.plot_metrics_comparison(save_plot=save_plots)
 
-    # ROC curves
     evaluator.plot_roc_curves(save_plot=save_plots)
 
-    # Confusion matrices for each model
     for model_name in models.keys():
         evaluator.plot_confusion_matrix(model_name, save_plot=save_plots)
 
-    # Generate report
     evaluator.generate_evaluation_report(save_to_file=save_plots)
 
-    # Get comparison table
     comparison_df = evaluator.get_comparison_table()
 
     return evaluator, comparison_df

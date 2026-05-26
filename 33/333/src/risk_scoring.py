@@ -26,7 +26,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -98,7 +97,6 @@ class RiskScorer:
         self.thresholds = thresholds or RISK_SCORING_CONFIG["thresholds"]
         self.feature_weights = feature_weights or RISK_SCORING_CONFIG["feature_weights"]
 
-        # Style to risk mapping
         self.style_risk_mapping = {
             "safe": 0.15,
             "normal": 0.35,
@@ -137,15 +135,12 @@ class RiskScorer:
             X = X.values
 
         if method == "probability":
-            # Use probability of risky/aggressive classes
             return self._probability_based_score(model, X)
 
         elif method == "weighted":
-            # Weighted combination of class probabilities
             return self._weighted_probability_score(model, X)
 
         elif method == "style_mapping":
-            # Map predicted style to risk score
             return self._style_mapping_score(model, X)
 
         else:
@@ -168,10 +163,8 @@ class RiskScorer:
             # Assume higher class indices = higher risk
             n_classes = probas.shape[1]
 
-            # Weight classes by risk level
             weights = np.array([i / (n_classes - 1) for i in range(n_classes)])
 
-            # Compute weighted sum of probabilities
             risk_scores = np.dot(probas, weights)
 
             return np.clip(risk_scores, 0, 1)
@@ -312,7 +305,6 @@ class RiskScorer:
             if matching_col:
                 values = features[matching_col].values
 
-                # Normalize to 0-1 range
                 min_val, max_val = values.min(), values.max()
                 if max_val > min_val:
                     normalized = (values - min_val) / (max_val - min_val)
@@ -327,12 +319,10 @@ class RiskScorer:
 
         if len(risk_components) > 0:
             composite_score = np.sum(risk_components, axis=0)
-            # Normalize to 0-1
             composite_score = composite_score / sum(self.feature_weights.values())
             return np.clip(composite_score, 0, 1)
 
         else:
-            # Return neutral score if no features match
             return np.full(len(features), 0.5)
 
     def assess_risk(
@@ -361,37 +351,30 @@ class RiskScorer:
         Union[ndarray, List[RiskAssessment]]
             Risk scores or detailed assessments
         """
-        # Compute risk scores
         risk_scores = self.compute_risk_score(model, X)
 
         if not return_details:
             return risk_scores
 
-        # Get predictions and probabilities
         predictions = model.predict(X if isinstance(X, np.ndarray) else X.values)
 
         probas = None
         if hasattr(model, "predict_proba"):
             probas = model.predict_proba(X if isinstance(X, np.ndarray) else X.values)
 
-        # Generate detailed assessments
         assessments = []
 
         for i in range(len(risk_scores)):
-            # Get risk level
             risk_level = self.get_risk_level(risk_scores[i])
 
-            # Get driving style
             pred = predictions[i]
             if isinstance(pred, (int, np.integer)):
                 driving_style = DRIVING_STYLE_CLASSES.get(pred, f"Class {pred}")
             else:
                 driving_style = str(pred)
 
-            # Get confidence
             confidence = probas[i].max() if probas is not None else 0.0
 
-            # Analyze contributing factors (if features available)
             contributing_factors = {}
             if isinstance(X, pd.DataFrame) and feature_names:
                 # Simple feature importance based on deviation from mean
@@ -405,7 +388,6 @@ class RiskScorer:
                             if abs(z_score) > 1:
                                 contributing_factors[col] = float(z_score)
 
-            # Generate recommendations
             recommendations = self._generate_recommendations(
                 risk_level, driving_style, contributing_factors
             )
@@ -447,7 +429,6 @@ class RiskScorer:
         """
         recommendations = []
 
-        # General recommendations based on risk level
         if risk_level == RiskLevel.CRITICAL:
             recommendations.extend([
                 "URGENT: Significantly reduce speed and increase caution",
@@ -468,7 +449,6 @@ class RiskScorer:
         else:  # LOW
             recommendations.append("Continue maintaining safe driving habits")
 
-        # Style-specific recommendations
         style_lower = driving_style.lower()
         if "aggressive" in style_lower:
             recommendations.append("Practice patience and avoid rushing")
@@ -477,7 +457,6 @@ class RiskScorer:
             recommendations.append("Enroll in a defensive driving course")
             recommendations.append("Consider using driver assistance features")
 
-        # Factor-specific recommendations
         for factor, value in contributing_factors.items():
             if "speed" in factor.lower() and value > 1.5:
                 recommendations.append("Reduce average driving speed")
@@ -486,7 +465,7 @@ class RiskScorer:
             elif "acceleration" in factor.lower() and value > 1.5:
                 recommendations.append("Accelerate more gradually from stops")
 
-        return recommendations[:5]  # Limit to 5 recommendations
+        return recommendations[:5]
 
     def plot_risk_distribution(
         self,
@@ -513,7 +492,6 @@ class RiskScorer:
         ax1 = axes[0]
         n, bins, patches = ax1.hist(risk_scores, bins=50, edgecolor="white", alpha=0.7)
 
-        # Color bars by risk level
         for patch, left_edge in zip(patches, bins[:-1]):
             if left_edge < self.thresholds["low"]:
                 patch.set_facecolor(colors[0])
@@ -524,7 +502,6 @@ class RiskScorer:
             else:
                 patch.set_facecolor(colors[3])
 
-        # Add threshold lines
         for thresh, label in zip(
             [self.thresholds["low"], self.thresholds["medium"], self.thresholds["high"]],
             ["Low/Medium", "Medium/High", "High/Critical"]
@@ -540,7 +517,6 @@ class RiskScorer:
         risk_levels = self.get_risk_levels_batch(risk_scores)
         level_counts = pd.Series([r.value for r in risk_levels]).value_counts()
 
-        # Ensure all levels present
         all_levels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
         counts = [level_counts.get(level, 0) for level in all_levels]
 
@@ -580,7 +556,6 @@ class RiskScorer:
         save_path : str, optional
             Path to save the plot
         """
-        # Sort by importance
         sorted_features = sorted(
             feature_importances.items(),
             key=lambda x: abs(x[1]),
@@ -717,7 +692,6 @@ if __name__ == "__main__":
     # Initialize risk scorer
     scorer = RiskScorer()
 
-    # Compute risk scores
     print("\nComputing risk scores...")
     risk_scores = scorer.compute_risk_score(mock_model, X_test)
 
@@ -727,7 +701,6 @@ if __name__ == "__main__":
     print(f"  Min:  {risk_scores.min():.3f}")
     print(f"  Max:  {risk_scores.max():.3f}")
 
-    # Get risk levels
     risk_levels = scorer.get_risk_levels_batch(risk_scores)
     level_counts = pd.Series([r.value for r in risk_levels]).value_counts()
 

@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -68,11 +67,9 @@ class ExploratoryDataAnalysis:
         self.target_column = target_column
         self.figures_dir = figures_dir or FIGURES_DIR
 
-        # Set visualization style
         plt.style.use('seaborn-v0_8-whitegrid')
         sns.set_palette(VISUALIZATION_CONFIG.get("color_palette", "husl"))
 
-        # Identify column types
         self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
         self.categorical_columns = df.select_dtypes(
             include=["object", "category"]
@@ -96,11 +93,9 @@ class ExploratoryDataAnalysis:
         print("SUMMARY STATISTICS")
         print("=" * 60)
 
-        # Basic info
         print(f"\nDataset Shape: {self.df.shape[0]:,} rows × {self.df.shape[1]} columns")
         print(f"Memory Usage: {self.df.memory_usage(deep=True).sum() / 1e6:.2f} MB")
 
-        # Numeric statistics
         if len(self.numeric_columns) > 0:
             print(f"\n{'─'*60}")
             print("Numeric Features Statistics")
@@ -108,7 +103,6 @@ class ExploratoryDataAnalysis:
 
             numeric_stats = self.df[self.numeric_columns].describe()
 
-            # Add additional statistics
             numeric_stats.loc["skewness"] = self.df[self.numeric_columns].skew()
             numeric_stats.loc["kurtosis"] = self.df[self.numeric_columns].kurtosis()
             numeric_stats.loc["missing"] = self.df[self.numeric_columns].isnull().sum()
@@ -121,7 +115,6 @@ class ExploratoryDataAnalysis:
             if save_to_file:
                 numeric_stats.to_csv(self.figures_dir / "numeric_statistics.csv")
 
-        # Categorical statistics
         if len(self.categorical_columns) > 0:
             print(f"\n{'─'*60}")
             print("Categorical Features Statistics")
@@ -170,17 +163,14 @@ class ExploratoryDataAnalysis:
         print(f"CLASS DISTRIBUTION ANALYSIS: {target}")
         print("=" * 60)
 
-        # Calculate distribution
         value_counts = self.df[target].value_counts()
         percentages = self.df[target].value_counts(normalize=True) * 100
 
-        # Display distribution
         print("\nClass Distribution:")
         print("-" * 40)
         for cls in value_counts.index:
             print(f"  {cls}: {value_counts[cls]:,} samples ({percentages[cls]:.2f}%)")
 
-        # Calculate imbalance metrics
         max_class = value_counts.max()
         min_class = value_counts.min()
         imbalance_ratio = max_class / min_class
@@ -194,17 +184,14 @@ class ExploratoryDataAnalysis:
             print("  ⚠ Significant class imbalance detected!")
             print("  Recommendation: Use SMOTE, class weights, or undersampling")
 
-        # Create visualization
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-        # Bar plot
         colors = sns.color_palette("husl", len(value_counts))
         bars = axes[0].bar(value_counts.index.astype(str), value_counts.values, color=colors)
         axes[0].set_xlabel("Class", fontsize=12)
         axes[0].set_ylabel("Count", fontsize=12)
         axes[0].set_title(f"Class Distribution: {target}", fontsize=14, fontweight="bold")
 
-        # Add value labels on bars
         for bar, val in zip(bars, value_counts.values):
             axes[0].text(
                 bar.get_x() + bar.get_width() / 2,
@@ -215,7 +202,6 @@ class ExploratoryDataAnalysis:
                 fontsize=10,
             )
 
-        # Pie chart
         axes[1].pie(
             value_counts.values,
             labels=[f"{cls}\n({pct:.1f}%)" for cls, pct in zip(value_counts.index, percentages)],
@@ -273,10 +259,8 @@ class ExploratoryDataAnalysis:
         print(f"CORRELATION ANALYSIS ({method.upper()})")
         print("=" * 60)
 
-        # Calculate correlation matrix
         corr_matrix = self.df[self.numeric_columns].corr(method=method)
 
-        # Find highly correlated pairs
         high_corr_pairs = []
         for i in range(len(corr_matrix.columns)):
             for j in range(i + 1, len(corr_matrix.columns)):
@@ -296,16 +280,13 @@ class ExploratoryDataAnalysis:
         else:
             print(f"\nNo feature pairs with |correlation| >= {threshold}")
 
-        # Create correlation heatmap
         n_features = len(self.numeric_columns)
         fig_size = max(10, min(20, n_features * 0.5))
 
         fig, ax = plt.subplots(figsize=(fig_size, fig_size * 0.8))
 
-        # Create mask for upper triangle
         mask = np.triu(np.ones_like(corr_matrix, dtype=bool), k=1)
 
-        # Generate heatmap
         sns.heatmap(
             corr_matrix,
             mask=mask,
@@ -577,11 +558,9 @@ class ExploratoryDataAnalysis:
         for col in missing_df.index:
             print(f"  {col}: {missing_df.loc[col, 'Missing Count']:,} ({missing_df.loc[col, 'Missing %']:.2f}%)")
 
-        # Create visualization
         if len(missing_df) > 0:
             fig, axes = plt.subplots(1, 2, figsize=(14, max(5, len(missing_df) * 0.3)))
 
-            # Bar plot of missing values
             colors = ["#ff6b6b" if pct > 30 else "#ffd93d" if pct > 10 else "#6bcb77"
                       for pct in missing_df["Missing %"]]
 
@@ -800,26 +779,19 @@ class ExploratoryDataAnalysis:
 
         report = {}
 
-        # 1. Summary Statistics
         report["summary_stats"] = self.summary_statistics(save_to_file=save_plots)
 
-        # 2. Missing Data Analysis
         report["missing_data"] = self.missing_data_analysis(save_plot=save_plots)
 
-        # 3. Class Distribution (if target exists)
         if self.target_column:
             report["class_distribution"] = self.class_distribution_analysis(save_plot=save_plots)
 
-        # 4. Feature Distributions
         self.feature_distributions(save_plot=save_plots)
 
-        # 5. Correlation Analysis
         report["correlation"] = self.correlation_analysis(save_plot=save_plots)
 
-        # 6. Outlier Analysis
         report["outliers"] = self.outlier_analysis(save_plot=save_plots)
 
-        # 7. Boxplots by Class (if target exists)
         if self.target_column:
             self.boxplots_by_class(save_plot=save_plots)
 
@@ -902,7 +874,6 @@ def plot_feature_importance(
     save_path : str, optional
         Path to save the plot
     """
-    # Sort by importance
     indices = np.argsort(importance_scores)[::-1][:top_n]
 
     plt.figure(figsize=(10, max(6, top_n * 0.3)))
@@ -936,12 +907,10 @@ def plot_feature_importance(
 # =============================================================================
 
 if __name__ == "__main__":
-    # Demonstration with synthetic data
     print("\n" + "=" * 60)
     print("EDA MODULE DEMONSTRATION")
     print("=" * 60)
 
-    # Create sample data
     np.random.seed(42)
     n_samples = 500
 
@@ -959,10 +928,8 @@ if __name__ == "__main__":
         ),
     })
 
-    # Add some missing values
     sample_df.loc[np.random.choice(n_samples, 30), "following_distance"] = np.nan
 
-    # Run EDA
     eda = ExploratoryDataAnalysis(sample_df, target_column="driving_style")
     report = eda.generate_full_report(save_plots=True)
 

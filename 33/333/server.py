@@ -58,7 +58,6 @@ except ImportError as e:
 
 app = FastAPI(title="DriveGuard AI", version="1.0.0")
 
-# Папки
 TEMP_DIR = Path("temp")
 TEMP_DIR.mkdir(exist_ok=True)
 
@@ -66,7 +65,6 @@ MODELS_DIR = Path("models")
 
 WEB_DIR = Path("web")
 
-# Монтируем статику
 if WEB_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
@@ -375,13 +373,10 @@ async def _inference_loop(
                 continue
             last_frame_time = now
 
-            # ── Optical flow ──
             flow_mag, flow_lat, flow_delta = flow_estimator.compute(frame)
 
-            # ── Детекция машин ──
             detections = vehicle_detector.detect(frame)
 
-            # ── Вычисляем bbox ведущего автомобиля ──
             leading_area = 0.0
             close_follow = 0
             if detections:
@@ -400,7 +395,6 @@ async def _inference_loop(
             area_delta = leading_area - prev_leading_area
             prev_leading_area = leading_area
 
-            # ── Обновление экстрактора признаков ──
             frame_feat = FrameFeatures(
                 flow_magnitude=flow_mag,
                 flow_lateral=flow_lat,
@@ -537,11 +531,9 @@ async def _inference_loop(
                     lane_changes=lane_changes,
                 )
 
-            # ── Отрисовка HUD ──
             if result is not None:
                 frame = visualizer.draw(frame, result, detections)
 
-            # ── Кодирование кадра ──
             _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 78])
             image_b64 = base64.b64encode(buffer).decode("utf-8")
 

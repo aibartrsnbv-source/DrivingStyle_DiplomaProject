@@ -19,21 +19,17 @@ _HOME = os.path.expanduser("~")
 # PROJECT PATHS
 # =============================================================================
 
-# Base project directory
 PROJECT_ROOT = Path(__file__).parent.parent
 
-# Data directories
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 
-# Output directories
 OUTPUT_DIR = PROJECT_ROOT / "outputs"
 MODELS_DIR = PROJECT_ROOT / "models"
 FIGURES_DIR = OUTPUT_DIR / "figures"
 REPORTS_DIR = OUTPUT_DIR / "reports"
 
-# Create directories if they don't exist
 for directory in [RAW_DATA_DIR, PROCESSED_DATA_DIR, MODELS_DIR, FIGURES_DIR, REPORTS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -54,7 +50,6 @@ def _find_dataset(filename: str, home_fallback: str) -> str:
     return str(fallback)
 
 
-# Primary datasets
 DATASET_PATHS = {
     # US Accidents dataset - contains accident records with features
     "us_accidents": _find_dataset(
@@ -84,7 +79,6 @@ DATASET_PATHS = {
     ),
 }
 
-# Additional dataset directories
 ARCHIVE_DIRS = {
     "archive_7":          str(Path(_HOME) / "Downloads" / "archive-7"),
     "archive_8":          str(Path(_HOME) / "Downloads" / "archive-8"),

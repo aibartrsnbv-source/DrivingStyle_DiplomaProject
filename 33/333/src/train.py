@@ -24,7 +24,6 @@ from sklearn.base import BaseEstimator
 from imblearn.over_sampling import SMOTE, ADASYN, RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -118,19 +117,16 @@ class ModelTrainer:
         if isinstance(y, pd.Series):
             y = y.values
 
-        # Check class distribution
         unique, counts = np.unique(y, return_counts=True)
         min_ratio = counts.min() / counts.max()
 
         print(f"Original class distribution: {dict(zip(unique, counts))}")
         print(f"Imbalance ratio: {min_ratio:.3f}")
 
-        # Skip if not severely imbalanced
         if min_ratio > IMBALANCE_CONFIG.get("imbalance_threshold", 0.3):
             print("Class imbalance is acceptable. Skipping resampling.")
             return X, y
 
-        # Apply resampling
         if method == "smote":
             sampler = SMOTE(random_state=self.random_state)
         elif method == "adasyn":
@@ -199,7 +195,6 @@ class ModelTrainer:
         print("TRAINING CLASSICAL ML MODELS")
         print("=" * 60)
 
-        # Convert to numpy
         if isinstance(X_train, pd.DataFrame):
             feature_names = list(X_train.columns)
             X_train = X_train.values
@@ -213,20 +208,17 @@ class ModelTrainer:
         if handle_imbalance:
             X_train, y_train = self.handle_class_imbalance(X_train, y_train)
 
-        # Get models to train
         if model_names is None:
             all_models = ModelFactory.get_all_models()
         else:
             all_models = {name: ModelFactory.get_model(name.lower().replace(" ", "_"))
                          for name in model_names}
 
-        # Training loop
         for model_name, model in all_models.items():
             print(f"\n{'─'*60}")
             print(f"Training: {model_name}")
             print("─" * 60)
 
-            # Cross-validation
             if use_cv:
                 cv = StratifiedKFold(
                     n_splits=cv_folds,
@@ -272,11 +264,9 @@ class ModelTrainer:
                 print(f"  ⚠ sample_weight not accepted ({e}), fitting without it")
                 model.fit(X_train, y_train)
 
-            # Calculate training accuracy
             train_acc = model.score(X_train, y_train)
             print(f"  Training Accuracy: {train_acc:.4f}")
 
-            # Calculate validation accuracy
             val_acc = None
             if X_val is not None and y_val is not None:
                 if isinstance(X_val, pd.DataFrame):
@@ -286,7 +276,6 @@ class ModelTrainer:
                 val_acc = model.score(X_val, y_val)
                 print(f"  Validation Accuracy: {val_acc:.4f}")
 
-            # Store model and results
             self.models[model_name] = model
             self.training_results[model_name] = {
                 "model_type": "classical",
@@ -358,7 +347,6 @@ class ModelTrainer:
         print(f"TRAINING DEEP LEARNING MODEL: {model_type.upper()}")
         print("=" * 60)
 
-        # Convert to numpy
         if isinstance(X_train, pd.DataFrame):
             X_train = X_train.values
         if isinstance(y_train, pd.Series):
@@ -372,20 +360,17 @@ class ModelTrainer:
         if handle_imbalance and not use_class_weights:
             X_train, y_train = self.handle_class_imbalance(X_train, y_train)
 
-        # Get data dimensions
         n_features = X_train.shape[1]
         n_classes = len(np.unique(y_train))
 
         print(f"\nInput features: {n_features}")
         print(f"Number of classes: {n_classes}")
 
-        # Compute class weights if needed
         class_weights = None
         if use_class_weights:
             class_weights = compute_class_weights(y_train)
             print(f"Class weights: {class_weights.numpy().round(3)}")
 
-        # Create model
         if model_type == "mlp":
             classifier = create_mlp_classifier(
                 input_dim=n_features,
@@ -421,7 +406,6 @@ class ModelTrainer:
         else:
             raise ValueError(f"Unknown model type: {model_type}")
 
-        # Train the model
         classifier.fit(
             X_train, y_train,
             X_val, y_val,
@@ -429,7 +413,6 @@ class ModelTrainer:
             verbose=True,
         )
 
-        # Calculate final metrics
         train_preds = classifier.predict(X_train)
         train_acc = (train_preds == y_train).mean()
 
@@ -495,10 +478,8 @@ class ModelTrainer:
         print("TRAINING ALL MODELS")
         print("=" * 60)
 
-        # Train classical models
         self.train_classical_models(X_train, y_train, X_val, y_val)
 
-        # Train deep learning model
         if include_deep_learning:
             self.train_deep_learning_model(
                 X_train, y_train, X_val, y_val,
@@ -599,13 +580,11 @@ class ModelTrainer:
             safe_name = name.lower().replace(" ", "_").replace("(", "").replace(")", "")
 
             if self.training_results[name]["model_type"] == "classical":
-                # Save sklearn model with pickle
                 filepath = save_dir / f"{safe_name}_{timestamp}.pkl"
                 with open(filepath, "wb") as f:
                     pickle.dump(model, f)
 
             else:
-                # Save PyTorch model
                 filepath = save_dir / f"{safe_name}_{timestamp}.pt"
                 torch.save({
                     "model_state_dict": model.model.state_dict(),
@@ -764,7 +743,6 @@ if __name__ == "__main__":
     print("TRAINING MODULE DEMONSTRATION")
     print("=" * 60)
 
-    # Create synthetic data
     np.random.seed(RANDOM_SEED)
     n_samples = 1000
     n_features = 20
@@ -783,11 +761,9 @@ if __name__ == "__main__":
     X = np.vstack(X_list).astype(np.float32)
     y = np.concatenate(y_list)
 
-    # Shuffle
     indices = np.random.permutation(len(X))
     X, y = X[indices], y[indices]
 
-    # Split data
     from sklearn.model_selection import train_test_split
 
     X_temp, X_test, y_temp, y_test = train_test_split(
@@ -804,7 +780,6 @@ if __name__ == "__main__":
 
     print(f"\nClass distribution (train): {dict(zip(*np.unique(y_train, return_counts=True)))}")
 
-    # Train all models
     trainer, summary = train_and_evaluate_pipeline(
         X_train, y_train,
         X_val, y_val,

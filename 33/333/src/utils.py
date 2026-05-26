@@ -32,7 +32,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -71,7 +70,6 @@ def setup_logger(
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, level.upper()))
 
-    # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_format = logging.Formatter(
@@ -81,7 +79,6 @@ def setup_logger(
     console_handler.setFormatter(console_format)
     logger.addHandler(console_handler)
 
-    # File handler
     if log_file:
         log_file = Path(log_file)
         log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -713,26 +710,21 @@ if __name__ == "__main__":
     print("UTILITIES MODULE DEMONSTRATION")
     print("=" * 60)
 
-    # Set random seeds
     set_random_seeds(42)
     print("✓ Random seeds set")
 
-    # Timer demonstration
     with Timer("Sample operation"):
         time.sleep(0.5)
 
-    # Create sample data
     sample_df = pd.DataFrame({
         "feature_1": np.random.randn(1000),
         "feature_2": np.random.randn(1000),
         "category": np.random.choice(["A", "B", "C"], 1000),
     })
 
-    # Memory optimization
     print("\nMemory optimization:")
     optimized_df = reduce_memory_usage(sample_df)
 
-    # Data validation
     print("\nData validation:")
     is_valid, issues = validate_dataframe(
         sample_df,
@@ -742,7 +734,6 @@ if __name__ == "__main__":
     if issues:
         print(f"  Issues: {issues}")
 
-    # Experiment tracking
     print("\nExperiment tracking:")
     tracker = ExperimentTracker("demo_experiment")
     tracker.log_params({"learning_rate": 0.001, "batch_size": 32})
@@ -752,7 +743,6 @@ if __name__ == "__main__":
 
     print(tracker.get_summary())
 
-    # Save experiment
     exp_path = tracker.save()
     print(f"\nExperiment saved to: {exp_path}")
 

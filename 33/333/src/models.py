@@ -33,7 +33,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -43,7 +42,6 @@ from src.config import (
     TORCH_SEED,
 )
 
-# Set random seeds for reproducibility
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(TORCH_SEED)
 if torch.cuda.is_available():
@@ -132,7 +130,6 @@ class ModelFactory:
             "Gradient Boosting": gb,
         }
 
-        # Try to add XGBoost
         xgb = None
         try:
             from xgboost import XGBClassifier  # noqa: F401
@@ -344,11 +341,9 @@ class MLP(nn.Module):
         self.use_batch_norm = use_batch_norm
         self.dropout = nn.Dropout(dropout_rate)
 
-        # Build layers
         self.layers = nn.ModuleList()
         self.batch_norms = nn.ModuleList()
 
-        # Input layer
         prev_dim = input_dim
         for hidden_dim in hidden_layers:
             self.layers.append(nn.Linear(prev_dim, hidden_dim))
@@ -356,10 +351,8 @@ class MLP(nn.Module):
                 self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
             prev_dim = hidden_dim
 
-        # Output layer
         self.output_layer = nn.Linear(prev_dim, num_classes)
 
-        # Initialize weights
         self._init_weights()
 
     def _init_weights(self):
@@ -461,7 +454,6 @@ class LSTM(nn.Module):
         """
         super(LSTM, self).__init__()
 
-        # Get defaults from config
         lstm_config = DL_CONFIG["lstm"]
         hidden_size = hidden_size or lstm_config["hidden_size"]
         num_layers = num_layers or lstm_config["num_layers"]
@@ -473,7 +465,6 @@ class LSTM(nn.Module):
         self.bidirectional = bidirectional
         self.num_directions = 2 if bidirectional else 1
 
-        # LSTM layer
         self.lstm = nn.LSTM(
             input_size=input_dim,
             hidden_size=hidden_size,
@@ -483,10 +474,8 @@ class LSTM(nn.Module):
             bidirectional=bidirectional,
         )
 
-        # Dropout layer
         self.dropout = nn.Dropout(dropout)
 
-        # Fully connected output layer
         fc_input_dim = hidden_size * self.num_directions
         self.fc = nn.Linear(fc_input_dim, num_classes)
 
@@ -513,7 +502,6 @@ class LSTM(nn.Module):
         Tensor
             Output logits of shape (batch_size, num_classes)
         """
-        # LSTM forward pass
         lstm_out, (hidden, cell) = self.lstm(x)
         # lstm_out shape: (batch_size, seq_len, hidden_size * num_directions)
 
@@ -523,14 +511,11 @@ class LSTM(nn.Module):
             context = torch.sum(attention_weights * lstm_out, dim=1)
             out = context
         else:
-            # Use last hidden state
             if self.bidirectional:
-                # Concatenate forward and backward hidden states
                 out = torch.cat((hidden[-2], hidden[-1]), dim=1)
             else:
                 out = hidden[-1]
 
-        # Dropout and output
         out = self.dropout(out)
         out = self.fc(out)
 
@@ -694,7 +679,6 @@ class PyTorchClassifier:
         """
         self.model = model
 
-        # Get defaults from config
         train_config = DL_CONFIG["training"]
         self.learning_rate = learning_rate or train_config["learning_rate"]
         self.batch_size = batch_size or train_config["batch_size"]
@@ -745,7 +729,6 @@ class PyTorchClassifier:
         self
             Fitted classifier
         """
-        # Create datasets
         train_dataset = TabularDataset(X_train, y_train)
         train_loader = DataLoader(
             train_dataset,
@@ -762,7 +745,6 @@ class PyTorchClassifier:
                 shuffle=False,
             )
 
-        # Setup training
         if class_weights is not None:
             class_weights = class_weights.to(self.device)
             criterion = nn.CrossEntropyLoss(weight=class_weights)
@@ -782,7 +764,6 @@ class PyTorchClassifier:
             patience=DL_CONFIG["training"]["lr_scheduler_patience"],
         )
 
-        # Training loop
         best_val_loss = float("inf")
         patience_counter = 0
 
@@ -796,7 +777,6 @@ class PyTorchClassifier:
             print("-" * 60)
 
         for epoch in range(self.epochs):
-            # Training phase
             self.model.train()
             train_loss = 0.0
 
@@ -815,7 +795,6 @@ class PyTorchClassifier:
             train_loss /= len(train_loader)
             self.training_history["train_loss"].append(train_loss)
 
-            # Validation phase
             if val_loader is not None:
                 val_loss, val_acc = self._validate(val_loader, criterion)
                 self.training_history["val_loss"].append(val_loss)
@@ -823,11 +802,9 @@ class PyTorchClassifier:
 
                 scheduler.step(val_loss)
 
-                # Early stopping
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
                     patience_counter = 0
-                    # Save best model state
                     self.best_model_state = self.model.state_dict().copy()
                 else:
                     patience_counter += 1
@@ -848,7 +825,6 @@ class PyTorchClassifier:
                 if verbose and (epoch + 1) % 10 == 0:
                     print(f"Epoch {epoch+1:3d}/{self.epochs} | Train Loss: {train_loss:.4f}")
 
-        # Restore best model
         if hasattr(self, "best_model_state"):
             self.model.load_state_dict(self.best_model_state)
 
@@ -1075,7 +1051,6 @@ def print_model_summary(model: nn.Module, input_size: Tuple[int, ...]) -> None:
     print("=" * 60)
     print(f"\nModel: {model.__class__.__name__}")
 
-    # Count parameters
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -1099,7 +1074,6 @@ if __name__ == "__main__":
     print("MODELS MODULE DEMONSTRATION")
     print("=" * 60)
 
-    # Create sample data
     np.random.seed(RANDOM_SEED)
     n_samples = 500
     n_features = 20
@@ -1108,7 +1082,6 @@ if __name__ == "__main__":
     X = np.random.randn(n_samples, n_features).astype(np.float32)
     y = np.random.randint(0, n_classes, n_samples)
 
-    # Split data
     from sklearn.model_selection import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=RANDOM_SEED
@@ -1122,7 +1095,6 @@ if __name__ == "__main__":
     print(f"  X_val: {X_val.shape}")
     print(f"  X_test: {X_test.shape}")
 
-    # Test classical ML models
     print("\n" + "-" * 60)
     print("Testing Classical ML Models")
     print("-" * 60)
@@ -1133,7 +1105,6 @@ if __name__ == "__main__":
         test_acc = model.score(X_test, y_test)
         print(f"  {name}: Train Acc = {train_acc:.4f}, Test Acc = {test_acc:.4f}")
 
-    # Test MLP
     print("\n" + "-" * 60)
     print("Testing MLP (PyTorch)")
     print("-" * 60)

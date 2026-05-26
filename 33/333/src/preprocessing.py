@@ -31,7 +31,6 @@ from sklearn.preprocessing import (
 from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.model_selection import train_test_split
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -225,7 +224,6 @@ class DataPreprocessor:
         else:
             raise ValueError(f"Unknown scaling method: {method}")
 
-        # Handle missing values before fitting scaler
         df_numeric = df[self.numeric_columns].copy()
         if df_numeric.isnull().any().any():
             df_numeric = pd.DataFrame(
@@ -341,20 +339,17 @@ def handle_missing_values(
     missing_before = df.isnull().sum().sum()
     print(f"Total missing values before: {missing_before:,}")
 
-    # Drop columns with too many missing values
     missing_pct = df.isnull().sum() / len(df)
     cols_to_drop = missing_pct[missing_pct > threshold].index.tolist()
     if cols_to_drop:
         print(f"Dropping {len(cols_to_drop)} columns with >{threshold*100}% missing")
         df = df.drop(columns=cols_to_drop)
 
-    # Identify column types if not provided
     if numeric_cols is None:
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     if categorical_cols is None:
         categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
 
-    # Handle numeric columns
     if strategy == "drop":
         df = df.dropna()
     elif strategy == "knn":
@@ -420,7 +415,6 @@ def scale_features(
         print("No numeric columns to scale")
         return (df, None) if return_scaler else df
 
-    # Select scaler
     if method == "standard":
         scaler = StandardScaler()
     elif method == "minmax":
@@ -430,7 +424,6 @@ def scale_features(
     else:
         raise ValueError(f"Unknown scaling method: {method}")
 
-    # Fit and transform
     df[columns] = scaler.fit_transform(df[columns])
 
     print(f"✓ Scaled {len(columns)} columns")
@@ -471,15 +464,12 @@ def encode_labels(
     df = df.copy()
 
     if label_mapping is None:
-        # Create automatic mapping
         unique_labels = df[target_column].unique()
         label_mapping = {label: idx for idx, label in enumerate(sorted(unique_labels))}
 
-    # Apply mapping
     encoded_col = f"{target_column}_encoded"
     df[encoded_col] = df[target_column].map(label_mapping)
 
-    # Handle unmapped values
     unmapped = df[encoded_col].isnull().sum()
     if unmapped > 0:
         print(f"⚠ {unmapped} values could not be mapped")
@@ -594,17 +584,14 @@ class FeatureEngineer:
                 continue
 
             for window in windows:
-                # Rolling mean
                 df[f"{col}_rolling_mean_{window}"] = (
                     df[col].rolling(window=window, min_periods=1).mean()
                 )
 
-                # Rolling standard deviation
                 df[f"{col}_rolling_std_{window}"] = (
                     df[col].rolling(window=window, min_periods=1).std()
                 )
 
-                # Rolling min and max
                 df[f"{col}_rolling_min_{window}"] = (
                     df[col].rolling(window=window, min_periods=1).min()
                 )
@@ -612,7 +599,6 @@ class FeatureEngineer:
                     df[col].rolling(window=window, min_periods=1).max()
                 )
 
-        # Fill NaN values from rolling operations
         df = df.bfill().ffill()
 
         new_cols = len(df.columns) - len(columns)
@@ -648,13 +634,11 @@ class FeatureEngineer:
         print(f"\nCreating statistical features for {len(columns)} columns...")
 
         if group_by and group_by in df.columns:
-            # Compute per-group statistics
             agg_funcs = ["mean", "std", "min", "max", "median"]
             stats_df = df.groupby(group_by)[columns].agg(agg_funcs)
             stats_df.columns = [f"{col}_{stat}" for col, stat in stats_df.columns]
             df = df.merge(stats_df, on=group_by, how="left")
         else:
-            # Compute global statistics as features
             for col in columns:
                 if col not in df.columns:
                     continue
@@ -710,7 +694,6 @@ class FeatureEngineer:
             df["jerk_x"]**2 + df["jerk_y"]**2 + df["jerk_z"]**2
         )
 
-        # Harsh events detection
         accel_threshold = 3.0  # m/s^2
         df["harsh_event"] = (df["accel_magnitude"] > accel_threshold).astype(int)
 
@@ -799,11 +782,9 @@ class FeatureEngineer:
         # Speed change (acceleration proxy)
         df["speed_change"] = df[speed_col].diff()
 
-        # Speeding indicator
         df["speeding"] = (df[speed_col] > speed_limit).astype(int)
         df["speed_over_limit"] = np.maximum(0, df[speed_col] - speed_limit)
 
-        # Sudden speed changes
         speed_change_threshold = 10.0  # km/h or m/s
         df["sudden_speed_change"] = (
             df["speed_change"].abs() > speed_change_threshold
@@ -844,15 +825,12 @@ class FeatureEngineer:
             if col not in df.columns:
                 continue
 
-            # Apply FFT
             signal = df[col].fillna(0).values
             fft_values = np.abs(fft(signal))
 
-            # Extract top frequency components
             for i in range(n_components):
                 df[f"{col}_freq_{i}"] = fft_values[i] if i < len(fft_values) else 0
 
-            # Dominant frequency magnitude
             df[f"{col}_max_freq"] = np.max(fft_values[:len(fft_values)//2])
 
         print(f"✓ Created frequency features")
@@ -886,7 +864,6 @@ class FeatureEngineer:
         if sensor_columns is None:
             sensor_columns = df.select_dtypes(include=[np.number]).columns.tolist()
 
-        # Apply all feature engineering methods
         df = self.create_rolling_features(df, sensor_columns[:5])  # Limit for efficiency
         df = self.create_acceleration_features(df)
         df = self.create_gyroscope_features(df)
@@ -1048,7 +1025,6 @@ def split_data(
     print("Splitting Data")
     print("-" * 40)
 
-    # Separate features and target
     X = df.drop(columns=[target_column])
     y = df[target_column]
 
@@ -1059,20 +1035,17 @@ def split_data(
         n_groups = groups.nunique()
         print(f"Using GROUP-aware split by '{group_column}' ({n_groups} unique groups)")
 
-        # First split: train+val vs test (by group)
         gss1 = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=random_state)
         temp_idx, test_idx = next(gss1.split(X, y, groups=groups))
         X_temp, X_test = X.iloc[temp_idx], X.iloc[test_idx]
         y_temp, y_test = y.iloc[temp_idx], y.iloc[test_idx]
         groups_temp = groups.iloc[temp_idx]
 
-        # Second split: train vs val (by group within temp)
         gss2 = GroupShuffleSplit(n_splits=1, test_size=val_size, random_state=random_state)
         train_idx, val_idx = next(gss2.split(X_temp, y_temp, groups=groups_temp))
         X_train, X_val = X_temp.iloc[train_idx], X_temp.iloc[val_idx]
         y_train, y_val = y_temp.iloc[train_idx], y_temp.iloc[val_idx]
 
-        # Verify no group overlap
         groups_train = set(X_train[group_column].unique())
         groups_val   = set(X_val[group_column].unique())
         groups_test  = set(X_test[group_column].unique())
@@ -1242,7 +1215,6 @@ if __name__ == "__main__":
     print("PREPROCESSING MODULE DEMONSTRATION")
     print("=" * 60)
 
-    # Create sample data
     np.random.seed(RANDOM_SEED)
     n_samples = 1000
 
@@ -1258,14 +1230,12 @@ if __name__ == "__main__":
         "driving_style": np.random.choice(["safe", "normal", "aggressive"], n_samples, p=[0.6, 0.25, 0.15]),
     })
 
-    # Add some missing values
     sample_data.loc[np.random.choice(n_samples, 50), "acceleration_x"] = np.nan
     sample_data.loc[np.random.choice(n_samples, 30), "speed"] = np.nan
 
     print(f"\nSample data shape: {sample_data.shape}")
     print(f"Missing values:\n{sample_data.isnull().sum()}")
 
-    # Run preprocessing pipeline
     X_train, X_val, X_test, y_train, y_val, y_test, preprocessor = preprocess_pipeline(
         sample_data,
         target_column="driving_style",

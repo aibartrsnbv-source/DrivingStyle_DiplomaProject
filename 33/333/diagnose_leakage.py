@@ -138,7 +138,7 @@ def main():
             print("    (возможно, некоторые строки были удалены при препроцессинге)")
 
         if n_valid > 0:
-            valid_positions = np.where(valid_mask)[0]  # позиции в y_test
+            valid_positions = np.where(valid_mask)[0]
 
             analysis_df = pd.DataFrame({
                 "true_class":  y_test.values[valid_positions],
@@ -221,7 +221,6 @@ def main():
     else:
         print("✓ Importances распределены без явного доминирования одной фичи.")
 
-    # Суммарная важность топ-3
     top3_imp = imp_df["importance"].head(3).sum()
     print(f"Суммарная importance топ-3 признаков: {top3_imp:.4f}")
     if top3_imp > 0.80:
@@ -271,7 +270,6 @@ def main():
     print(f"Top-3 features importance sum:       {top3_imp:.4f}")
     print()
 
-    # Итоговый вердикт
     leakage_signals = []
 
     if test_acc > 0.97:

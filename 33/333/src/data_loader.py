@@ -17,7 +17,6 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.config import (
@@ -111,7 +110,6 @@ class DataLoader:
             print(f"✗ Error loading dataset: {str(e)}")
             raise
 
-        # Store dataset and metadata
         self.datasets[dataset_name] = df
         self.metadata[dataset_name] = {
             "file_path": file_path,
@@ -269,7 +267,6 @@ class DataLoader:
 
         loaded_datasets = {}
 
-        # Try to load each dataset, skip if file not found
         dataset_loaders = {
             "us_accidents": self.load_us_accidents,
             "carla_data": self.load_carla_data,
@@ -404,10 +401,8 @@ class DataLoader:
         print(f"DATASET INFO: {dataset_name}")
         print("=" * 60)
 
-        # Basic info
         print(f"\nShape: {df.shape[0]:,} rows × {df.shape[1]} columns")
 
-        # Column information
         print(f"\nColumn Details:")
         print("-" * 60)
 
@@ -426,7 +421,6 @@ class DataLoader:
                 sample_vals = df[col].dropna().unique()[:5]
                 print(f"    Values: {list(sample_vals)}")
 
-        # Numeric column statistics
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) > 0:
             print(f"\nNumeric Columns Summary:")
@@ -464,7 +458,6 @@ class DataLoader:
         for cls in distribution.index:
             print(f"  {cls}: {distribution[cls]:,} ({percentages[cls]:.2f}%)")
 
-        # Check for class imbalance
         min_pct = percentages.min()
         if min_pct < 20:
             print(f"\n⚠ Class imbalance detected! Minority class: {min_pct:.2f}%")
@@ -675,7 +668,6 @@ def _load_uah_driveset(root_dir: str) -> Optional[pd.DataFrame]:
         accel_file = trip_dir / "RAW_ACCELEROMETERS.txt"
         gps_file   = trip_dir / "RAW_GPS.txt"
 
-        # Load the full sensor traces once per trip
         try:
             a = None
             if accel_file.exists():
@@ -787,7 +779,6 @@ def load_and_unify_datasets() -> pd.DataFrame:
         try:
             df = pd.read_csv(carla_path, low_memory=False)
             df["data_source"] = "carla"
-            # Map sensor columns to unified names
             col_map = {
                 "accelX": "accel_x_mean", "accelY": "accel_y_mean", "accelZ": "accel_z_mean",
                 "gyroX":  "gyro_x_std",   "gyroY":  "gyro_y_std",   "gyroZ":  "gyro_z_std",
@@ -837,7 +828,6 @@ def load_and_unify_datasets() -> pd.DataFrame:
                 ).clip(upper=2)
             elif "anomalous_event" in df.columns:
                 df["driving_style_encoded"] = df["anomalous_event"].fillna(0).astype(int)
-            # Map columns to unified names
             rename_map = {
                 "speed":         "avg_speed",
                 "acceleration":  "avg_acceleration",
@@ -882,7 +872,6 @@ def load_and_unify_datasets() -> pd.DataFrame:
     if kaggle_path and os.path.exists(kaggle_path):
         try:
             df_raw = pd.read_csv(kaggle_path, low_memory=False)
-            # Normalize column names
             df_raw.columns = [c.strip() for c in df_raw.columns]
             col_lower = {c.lower(): c for c in df_raw.columns}
 
@@ -1006,16 +995,13 @@ def load_and_unify_datasets() -> pd.DataFrame:
     # ── Merge ─────────────────────────────────────────────────────────────
     combined = pd.concat(frames, ignore_index=True, sort=False)
 
-    # Ensure all target columns exist (fill missing with NaN)
     for col in TARGET_COLS:
         if col not in combined.columns:
             combined[col] = np.nan
 
-    # Fill NaN with median (numeric only)
     num_cols = combined.select_dtypes(include=[np.number]).columns
     combined[num_cols] = combined[num_cols].fillna(combined[num_cols].median())
 
-    # Ensure driving_style_encoded is valid int
     if "driving_style_encoded" not in combined.columns or combined["driving_style_encoded"].isna().all():
         combined["driving_style_encoded"] = 0
     combined["driving_style_encoded"] = combined["driving_style_encoded"].fillna(0).astype(int)
@@ -1049,7 +1035,6 @@ if __name__ == "__main__":
 
     loader = DataLoader()
 
-    # Try to load real datasets
     try:
         datasets = loader.load_all_datasets(nrows=1000)  # Limit rows for demo
 
@@ -1061,7 +1046,6 @@ if __name__ == "__main__":
         print(f"\nCould not load real datasets: {e}")
         print("\nGenerating synthetic dataset for demonstration...")
 
-        # Generate and inspect synthetic data
         synthetic_df = create_sample_dataset(n_samples=1000)
         loader.datasets["synthetic"] = synthetic_df
         loader.print_dataset_info(synthetic_df, "synthetic")

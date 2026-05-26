@@ -33,11 +33,9 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-# Add project root to path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# Import project modules
 from src.config import (
     DATASET_PATHS,
     RANDOM_SEED,
@@ -71,7 +69,6 @@ from src.utils import (
 import sklearn
 sklearn.set_config(enable_metadata_routing=True)
 
-# Setup logger
 logger = setup_logger(
     name="main_pipeline",
     log_file=OUTPUT_DIR / "pipeline.log",
@@ -116,19 +113,16 @@ class DrivingStylePipeline:
         self.include_deep_learning = include_deep_learning
         self.quick_mode = quick_mode
 
-        # Initialize components
         self.loader = DataLoader()
         self.trainer = ModelTrainer()
         self.evaluator = ModelEvaluator()
         self.risk_scorer = RiskScorer()
 
-        # Initialize experiment tracker
         self.experiment = ExperimentTracker(
             experiment_name="driving_style_classification",
             output_dir=OUTPUT_DIR / "experiments",
         )
 
-        # Data containers
         self.raw_data = None
         self.X_train = None
         self.X_val = None
@@ -138,7 +132,6 @@ class DrivingStylePipeline:
         self.y_test = None
         self.preprocessor = None
 
-        # Results
         self.models = {}
         self.evaluation_results = {}
         self.risk_scores = None
@@ -158,7 +151,6 @@ class DrivingStylePipeline:
         print("  Bachelor Diploma Project")
         print("=" * 70)
 
-        # Log configuration
         self.experiment.log_params(
             {
                 "use_synthetic": self.use_synthetic,
@@ -169,25 +161,18 @@ class DrivingStylePipeline:
         )
 
         try:
-            # Step 1: Load Data
             self.step_1_load_data()
 
-            # Step 2: Exploratory Data Analysis
             self.step_2_eda()
 
-            # Step 3: Preprocess Data
             self.step_3_preprocess()
 
-            # Step 4: Train Models
             self.step_4_train_models()
 
-            # Step 5: Evaluate Models
             self.step_5_evaluate()
 
-            # Step 6: Risk Scoring
             self.step_6_risk_scoring()
 
-            # Step 7: Export Results
             results = self.step_7_export_results()
 
             print("\n" + "=" * 70)
@@ -202,7 +187,6 @@ class DrivingStylePipeline:
             raise
 
         finally:
-            # Save experiment log
             self.experiment.save()
 
     def step_1_load_data(self) -> None:
@@ -232,14 +216,12 @@ class DrivingStylePipeline:
                 self.raw_data = load_and_unify_datasets()
                 self.target_column = "driving_style_encoded"
 
-            # Validate data
             self.loader.validate_dataset(
                 self.raw_data,
                 "Loaded Dataset",
                 check_duplicates=True,
             )
 
-            # Log data info
             self.experiment.log_params(
                 {
                     "n_samples": len(self.raw_data),
@@ -260,7 +242,6 @@ class DrivingStylePipeline:
         pd.DataFrame
             Loaded data or synthetic fallback
         """
-        # Try each dataset
         datasets_to_try = [
             ("driver_behavior", DATASET_PATHS.get("driver_behavior")),
             ("eco_driving", DATASET_PATHS.get("eco_driving")),
@@ -305,7 +286,6 @@ class DrivingStylePipeline:
         str
             Name of target column
         """
-        # Common target column names
         target_candidates = [
             "driving_style",
             "label",
@@ -349,17 +329,14 @@ class DrivingStylePipeline:
         print("=" * 70)
 
         with Timer("EDA"):
-            # Initialize EDA
             eda = ExploratoryDataAnalysis(
                 self.raw_data,
                 target_column=self.target_column,
                 figures_dir=FIGURES_DIR,
             )
 
-            # Quick summary
             quick_eda(self.raw_data, self.target_column)
 
-            # Detailed analysis
             if not self.quick_mode:
                 # Summary statistics
                 eda.summary_statistics(save_to_file=True)
@@ -390,14 +367,12 @@ class DrivingStylePipeline:
             # Engineer additional features for diploma analysis
             self.raw_data = engineer_features(self.raw_data)
 
-            # Handle missing values
             self.raw_data = handle_missing_values(
                 self.raw_data,
                 strategy="median",
                 threshold=0.5,
             )
 
-            # Encode target labels if needed
             if self.raw_data[self.target_column].dtype == "object":
                 self.raw_data, label_mapping = encode_labels(
                     self.raw_data,
@@ -406,7 +381,6 @@ class DrivingStylePipeline:
                 self.target_column = f"{self.target_column}_encoded"
                 self.experiment.log_params({"label_mapping": label_mapping})
 
-            # Run preprocessing pipeline
             (
                 self.X_train,
                 self.X_val,
@@ -420,7 +394,6 @@ class DrivingStylePipeline:
                 target_column=self.target_column,
             )
 
-            # Log preprocessing info
             self.experiment.log_params(
                 {
                     "train_samples": len(self.X_train),
@@ -442,7 +415,6 @@ class DrivingStylePipeline:
         print("=" * 70)
 
         with Timer("Model training"):
-            # Train classical ML models
             self.trainer.train_classical_models(
                 self.X_train,
                 self.y_train,
@@ -453,7 +425,6 @@ class DrivingStylePipeline:
                 handle_imbalance=True,
             )
 
-            # Train deep learning model
             if self.include_deep_learning:
                 self.trainer.train_deep_learning_model(
                     self.X_train,
@@ -464,10 +435,8 @@ class DrivingStylePipeline:
                     use_class_weights=True,
                 )
 
-            # Get all trained models
             self.models = self.trainer.models
 
-            # Log training results
             for model_name, results in self.trainer.training_results.items():
                 self.experiment.log_metric(
                     f"{model_name}_train_acc",
@@ -479,7 +448,6 @@ class DrivingStylePipeline:
                         results["val_accuracy"],
                     )
 
-            # Save models
             saved_paths = self.trainer.save_models()
             for name, path in saved_paths.items():
                 self.experiment.log_artifact(path, f"Trained model: {name}")
@@ -513,10 +481,8 @@ class DrivingStylePipeline:
                 save_plots=True,
             )
 
-            # Store results
             self.evaluation_results = self.evaluator.results
 
-            # Log metrics
             for model_name, results in self.evaluation_results.items():
                 for metric, value in results["metrics"].items():
                     if value is not None:
@@ -574,24 +540,20 @@ class DrivingStylePipeline:
             # Print interpretation guide
             print_risk_interpretation_guide()
 
-            # Get best model for risk scoring
             best_model_name = self.trainer.best_model_name
             if best_model_name is None or best_model_name not in self.models:
                 best_model_name = next(iter(self.models))
                 self.trainer.best_model_name = best_model_name
             best_model = self.models[best_model_name]
 
-            # Compute risk scores
             self.risk_scores = self.risk_scorer.compute_risk_score(
                 best_model,
                 self.X_test,
                 method="probability",
             )
 
-            # Get risk levels
             risk_levels = self.risk_scorer.get_risk_levels_batch(self.risk_scores)
 
-            # Statistics
             risk_stats = {
                 "mean": float(self.risk_scores.mean()),
                 "std": float(self.risk_scores.std()),
@@ -610,13 +572,11 @@ class DrivingStylePipeline:
                 pct = count / len(risk_levels) * 100
                 print(f"  {level}: {count} ({pct:.1f}%)")
 
-            # Plot distribution
             self.risk_scorer.plot_risk_distribution(
                 self.risk_scores,
                 save_path=FIGURES_DIR / "risk_score_distribution.png",
             )
 
-            # Log metrics
             self.experiment.log_params({"risk_score_stats": risk_stats})
 
             print("\n✓ Risk scoring complete")
@@ -628,7 +588,6 @@ class DrivingStylePipeline:
         print("=" * 70)
 
         with Timer("Results export"):
-            # Compile results
             results = {
                 "pipeline_info": {
                     "timestamp": datetime.now().isoformat(),
@@ -650,17 +609,14 @@ class DrivingStylePipeline:
                 },
             }
 
-            # Add model results
             for model_name, eval_result in self.evaluation_results.items():
                 results["model_results"][model_name] = eval_result["metrics"]
 
-            # Save results
             results_path = OUTPUT_DIR / "pipeline_results.json"
             save_json(results, results_path)
 
             print(f"\n✓ Results saved to: {results_path}")
 
-            # Print summary
             print("\n" + "=" * 50)
             print("PIPELINE SUMMARY")
             print("=" * 50)
@@ -728,18 +684,14 @@ Examples:
 
 def main():
     """Main entry point."""
-    # Parse arguments
     args = parse_arguments()
 
-    # Print config if requested
     if args.config:
         get_config_summary()
         return
 
-    # Set random seed
     set_random_seeds(args.seed)
 
-    # Print header
     print("\n" + "╔" + "═" * 68 + "╗")
     print("║" + " " * 68 + "║")
     print(
@@ -751,7 +703,6 @@ def main():
     print("║" + " " * 68 + "║")
     print("╚" + "═" * 68 + "╝")
 
-    # Create and run pipeline
     pipeline = DrivingStylePipeline(
         use_synthetic=args.synthetic,
         include_deep_learning=not args.no_dl,
